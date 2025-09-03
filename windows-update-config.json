@@ -1,0 +1,92 @@
+{
+    "version": "2.1.0",
+    "description": "Configuration file for Windows Update Script",
+    "settings": {
+        "general": {
+            "enableDetailedLogging": true,
+            "maxLogFileSizeMB": 50,
+            "logRetentionDays": 30,
+            "enableEventLogIntegration": true,
+            "suppressRebootPrompts": true
+        },
+        "winget": {
+            "enableWingetUpdates": true,
+            "updateSourcesBeforeRun": true,
+            "handleConflictingApps": true,
+            "maxUpdateTimeoutMinutes": 10,
+            "retryFailedUpdates": true,
+            "maxRetryAttempts": 3,
+            "excludedApplications": [
+                "Example.ExcludedApp",
+                "Another.ExcludedApp"
+            ]
+        },
+        "windowsUpdate": {
+            "enableWindowsUpdates": true,
+            "includeDriverUpdates": true,
+            "includeOptionalUpdates": false,
+            "includeBetaUpdates": false,
+            "autoRebootAfterUpdates": true,
+            "rebootDelayMinutes": 5,
+            "maxUpdateCycles": 3
+        },
+        "maintenance": {
+            "enableSystemMaintenance": true,
+            "cleanTempFiles": true,
+            "resetWindowsUpdateComponents": true,
+            "runSystemFileChecker": true,
+            "performDiskCleanup": false,
+            "defragmentDrives": false,
+            "tempFileAgeThresholdDays": 7
+        },
+        "scheduling": {
+            "patchTuesdayHour": 2,
+            "patchTuesdayMinute": 0,
+            "enableRetrySchedule": true,
+            "retryDays": 7,
+            "retryHour": 3,
+            "retryMinute": 0
+        },
+        "dashboard": {
+            "enableDashboard": false,
+            "dashboardPort": 8080,
+            "dashboardRefreshSeconds": 3,
+            "keepDashboardOpenAfterCompletion": true,
+            "dashboardTheme": "dark"
+        },
+        "security": {
+            "validateDownloads": true,
+            "requireElevatedPrivileges": true,
+            "allowExternalDownloads": true,
+            "trustedDownloadSources": [
+                "https://www.grc.com/",
+                "https://github.com/",
+                "https://aka.ms/"
+            ]
+        },
+        "notifications": {
+            "enableEmailNotifications": false,
+            "smtpServer": "",
+            "smtpPort": 587,
+            "emailFrom": "",
+            "emailTo": [],
+            "notifyOnSuccess": false,
+            "notifyOnFailure": true,
+            "notifyOnReboot": false
+        },
+        "advanced": {
+            "enableDebugMode": false,
+            "enableTestMode": false,
+            "skipWin11UpgradeBypass": false,
+            "customScriptPath": "C:\\Scripts",
+            "enableBackupBeforeUpdates": false,
+            "backupLocation": "C:\\Backups\\WindowsUpdate",
+            "enableRollbackCapability": false
+        }
+    },
+    "metadata": {
+        "lastModified": "2025-09-03T12:00:00Z",
+        "createdBy": "Windows Update Script v2.1.0",
+        "configVersion": "1.0"
+    }
+}

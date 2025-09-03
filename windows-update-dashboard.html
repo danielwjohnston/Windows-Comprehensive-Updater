@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows Update Monitor - Live Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0b1426 0%, #1a1a2e 100%);
+            color: #e6e6e6;
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .header h1 {
+            color: #00d9ff;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+        }
+        
+        .header .subtitle {
+            color: #a0a0a0;
+            font-size: 1.1em;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 217, 255, 0.1);
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #00d9ff, #7b68ee);
+            opacity: 0.8;
+        }
+        
+        .card h2 {
+            color: #00d9ff;
+            font-size: 1.4em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 16px;
+            border-radius: 25px;
+            font-weight: 600;
+            font-size: 0.9em;
+            margin: 5px 0;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-running {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            border: 1px solid rgba(0, 255, 136, 0.4);
+        }
+        
+        .status-completed {
+            background: rgba(0, 217, 255, 0.2);
+            color: #00d9ff;
+            border: 1px solid rgba(0, 217, 255, 0.4);
+        }
+        
+        .status-error {
+            background: rgba(255, 82, 82, 0.2);
+            color: #ff5252;
+            border: 1px solid rgba(255, 82, 82, 0.4);
+        }
+        
+        .status-idle {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+            border: 1px solid rgba(255, 193, 7, 0.4);
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .progress-container {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            height: 20px;
+            margin: 15px 0;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00d9ff, #7b68ee);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+        
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            animation: shimmer 2s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: 600;
+            color: #fff;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+            font-size: 0.9em;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .info-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 8px;
+            border-left: 3px solid #00d9ff;
+        }
+        
+        .info-label {
+            font-size: 0.9em;
+            color: #a0a0a0;
+            margin-bottom: 5px;
+        }
+        
+        .info-value {
+            font-weight: 600;
+            color: #e6e6e6;
+            font-size: 1.1em;
+        }
+        
+        .log-container {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            padding: 20px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
+        }
+        
+        .log-entry:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .log-timestamp {
+            color: #7b68ee;
+            font-weight: 600;
+        }
+        
+        .log-level-INFO {
+            color: #00ff88;
+        }
+        
+        .log-level-WARNING {
+            color: #ffc107;
+        }
+        
+        .log-level-ERROR {
+            color: #ff5252;
+        }
+        
+        .log-level-SUCCESS {
+            color: #00d9ff;
+        }
+        
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+        
+        .stats-label {
+            color: #a0a0a0;
+        }
+        
+        .stats-value {
+            font-weight: 600;
+            color: #00d9ff;
+        }
+        
+        .last-updated {
+            text-align: center;
+            color: #a0a0a0;
+            font-size: 0.9em;
+            margin-top: 20px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+        
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+            z-index: 1000;
+        }
+        
+        .connected {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            border: 1px solid rgba(0, 255, 136, 0.4);
+        }
+        
+        .disconnected {
+            background: rgba(255, 82, 82, 0.2);
+            color: #ff5252;
+            border: 1px solid rgba(255, 82, 82, 0.4);
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #00d9ff, #7b68ee);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #00b8cc, #6a5acd);
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status" id="connectionStatus">
+        <span id="connectionText">Connecting...</span>
+    </div>
+    
+    <div class="container">
+        <div class="header">
+            <h1>🔄 Windows Update Monitor</h1>
+            <div class="subtitle">Real-time monitoring of automated Windows and application updates</div>
+        </div>
+        
+        <div class="grid">
+            <div class="card">
+                <h2>📊 Current Status</h2>
+                <div class="status-indicator" id="overallStatus">
+                    <span id="statusText">Initializing...</span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+                    <div class="progress-text" id="progressText">0%</div>
+                </div>
+                <div style="margin-top: 15px; font-size: 1.1em; color: #e6e6e6;" id="currentOperation">
+                    Waiting for updates...
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>💻 System Information</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Computer Name</div>
+                        <div class="info-value" id="computerName">Loading...</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">User Account</div>
+                        <div class="info-value" id="userName">Loading...</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">PowerShell Version</div>
+                        <div class="info-value" id="psVersion">Loading...</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Script Path</div>
+                        <div class="info-value" id="scriptPath">Loading...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>📈 Update Statistics</h2>
+                <div class="stats-row">
+                    <span class="stats-label">Total Updates Installed</span>
+                    <span class="stats-value" id="totalUpdates">0</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stats-label">Current Update Cycle</span>
+                    <span class="stats-value" id="currentCycle">0</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stats-label">Winget Applications</span>
+                    <span class="stats-value" id="wingetApps">0</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stats-label">Execution Time</span>
+                    <span class="stats-value" id="executionTime">00:00:00</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>🚀 Phase Progress</h2>
+                <div id="phaseIndicators">
+                    <div class="stats-row">
+                        <span class="stats-label">🔧 Winget Updates</span>
+                        <span class="stats-value" id="wingetStatus">Pending</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-label">🏠 Windows Updates</span>
+                        <span class="stats-value" id="windowsStatus">Pending</span>
+                    </div>
+                    <div class="stats-row">
+                        <span class="stats-label">🧹 System Maintenance</span>
+                        <span class="stats-value" id="maintenanceStatus">Pending</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>📝 Live Activity Log</h2>
+            <div class="log-container" id="logContainer">
+                <div class="log-entry">
+                    <span class="log-timestamp">[Loading...]</span>
+                    <span class="log-level-INFO">[INFO]</span>
+                    Dashboard initialized - waiting for script activity...
+                </div>
+            </div>
+        </div>
+        
+        <div class="last-updated">
+            Last updated: <span id="lastUpdated">Never</span>
+        </div>
+    </div>
+    
+    <script>
+        let isConnected = false;
+        let startTime = new Date();
+        
+        // Update connection status indicator
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connectionStatus');
+            const textElement = document.getElementById('connectionText');
+            
+            if (connected) {
+                statusElement.className = 'connection-status connected';
+                textElement.textContent = 'Connected';
+                isConnected = true;
+            } else {
+                statusElement.className = 'connection-status disconnected';
+                textElement.textContent = 'Disconnected';
+                isConnected = false;
+            }
+        }
+        
+        // Format timestamp for display
+        function formatTimestamp(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleTimeString();
+        }
+        
+        // Update execution time
+        function updateExecutionTime() {
+            const now = new Date();
+            const diff = Math.floor((now - startTime) / 1000);
+            const hours = Math.floor(diff / 3600);
+            const minutes = Math.floor((diff % 3600) / 60);
+            const seconds = diff % 60;
+            
+            const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            document.getElementById('executionTime').textContent = timeStr;
+        }
+        
+        // Update dashboard with status data
+        function updateDashboard(data) {
+            updateConnectionStatus(true);
+            
+            // Update overall status
+            const statusElement = document.getElementById('overallStatus');
+            const statusText = document.getElementById('statusText');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const currentOperation = document.getElementById('currentOperation');
+            
+            // Determine status class based on phase
+            let statusClass = 'status-running';
+            let displayText = 'Running';
+            
+            if (data.phase === 'completed') {
+                statusClass = data.overallSuccess ? 'status-completed' : 'status-error';
+                displayText = data.overallSuccess ? 'Completed Successfully' : 'Completed with Errors';
+            } else if (data.phase === 'critical-error') {
+                statusClass = 'status-error';
+                displayText = 'Critical Error';
+            } else if (data.phase === 'initialization') {
+                statusClass = 'status-idle';
+                displayText = 'Initializing';
+            }
+            
+            statusElement.className = 'status-indicator ' + statusClass;
+            statusText.textContent = displayText;
+            
+            // Update progress
+            const progress = data.progress || 0;
+            progressBar.style.width = progress + '%';
+            progressText.textContent = progress + '%';
+            
+            // Update current operation
+            currentOperation.textContent = data.currentOperation || 'Waiting for updates...';
+            
+            // Update system information
+            if (data.systemInfo) {
+                document.getElementById('computerName').textContent = data.systemInfo.computerName || 'Unknown';
+                document.getElementById('userName').textContent = data.systemInfo.userName || 'Unknown';
+                document.getElementById('psVersion').textContent = data.systemInfo.psVersion || 'Unknown';
+                document.getElementById('scriptPath').textContent = data.systemInfo.scriptPath?.split('\\').pop() || 'Unknown';
+            }
+            
+            // Update statistics
+            document.getElementById('totalUpdates').textContent = data.totalUpdates || '0';
+            document.getElementById('currentCycle').textContent = data.currentCycle || '0';
+            document.getElementById('wingetApps').textContent = data.wingetApps || '0';
+            
+            if (data.executionTime) {
+                document.getElementById('executionTime').textContent = data.executionTime;
+            }
+            
+            // Update phase status
+            if (data.wingetSuccess !== undefined) {
+                document.getElementById('wingetStatus').textContent = data.wingetSuccess ? 'Completed' : 'Failed';
+            } else if (data.phase && data.phase.includes('winget')) {
+                document.getElementById('wingetStatus').textContent = 'Running';
+            }
+            
+            if (data.windowsSuccess !== undefined) {
+                document.getElementById('windowsStatus').textContent = data.windowsSuccess ? 'Completed' : 'Failed';
+            } else if (data.phase && data.phase.includes('windows')) {
+                document.getElementById('windowsStatus').textContent = 'Running';
+            }
+            
+            if (data.maintenanceSuccess !== undefined) {
+                document.getElementById('maintenanceStatus').textContent = data.maintenanceSuccess ? 'Completed' : 'Failed';
+            } else if (data.phase && data.phase.includes('maintenance')) {
+                document.getElementById('maintenanceStatus').textContent = 'Running';
+            }
+            
+            // Update last updated timestamp
+            document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+        }
+        
+        // Update log display
+        function updateLog(logData) {
+            const logContainer = document.getElementById('logContainer');
+            
+            if (logData && logData.trim()) {
+                const lines = logData.split('\n').filter(line => line.trim());
+                const recentLines = lines.slice(-25); // Show last 25 entries
+                
+                logContainer.innerHTML = '';
+                
+                recentLines.forEach(line => {
+                    const logEntry = document.createElement('div');
+                    logEntry.className = 'log-entry';
+                    
+                    // Parse log line format: [timestamp] [level] message
+                    const match = line.match(/^\[(.*?)\]\s*\[(.*?)\]\s*(.*)$/);
+                    if (match) {
+                        const [, timestamp, level, message] = match;
+                        
+                        logEntry.innerHTML = 
+                            `<span class="log-timestamp">[${timestamp}]</span> ` +
+                            `<span class="log-level-${level}">[${level}]</span> ` +
+                            `<span>${message}</span>`;
+                    } else {
+                        logEntry.textContent = line;
+                    }
+                    
+                    logContainer.appendChild(logEntry);
+                });
+                
+                // Auto-scroll to bottom
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        }
+        
+        // Fetch status updates
+        async function fetchStatus() {
+            try {
+                const response = await fetch('update-status.json?t=' + Date.now());
+                if (response.ok) {
+                    const data = await response.json();
+                    updateDashboard(data);
+                    
+                    // Update start time if available
+                    if (data.startTime && !startTime) {
+                        startTime = new Date(data.startTime);
+                    }
+                } else {
+                    updateConnectionStatus(false);
+                }
+            } catch (error) {
+                updateConnectionStatus(false);
+                console.log('Status fetch failed:', error.message);
+            }
+        }
+        
+        // Fetch log updates
+        async function fetchLog() {
+            try {
+                const response = await fetch('WindowsUpdateLog.txt?t=' + Date.now());
+                if (response.ok) {
+                    const logData = await response.text();
+                    updateLog(logData);
+                }
+            } catch (error) {
+                console.log('Log fetch failed:', error.message);
+            }
+        }
+        
+        // Initialize dashboard
+        function init() {
+            updateConnectionStatus(false);
+            
+            // Start polling for updates
+            setInterval(fetchStatus, 2000); // Every 2 seconds
+            setInterval(fetchLog, 3000);    // Every 3 seconds
+            setInterval(updateExecutionTime, 1000); // Every second
+            
+            // Initial fetch
+            fetchStatus();
+            fetchLog();
+            
+            console.log('Windows Update Dashboard initialized');
+        }
+        
+        // Start when page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

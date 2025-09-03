@@ -18,10 +18,7 @@ A fully automated Windows update solution that handles system updates, applicati
 ## 🚀 Quick Start
 
 ### Prerequisites
-<<<<<<< HEAD
 
-=======
->>>>>>> 812fb49 (Implement code changes to enhance functionality and improve performance)
 - Windows 10/11 (Server versions may work but are not officially supported)
 - PowerShell 5.1 or later
 - Administrative privileges
@@ -93,20 +90,14 @@ To create scheduled tasks for automatic updates:
 ```
 
 This will create two scheduled tasks:
-<<<<<<< HEAD
 
-=======
->>>>>>> 812fb49 (Implement code changes to enhance functionality and improve performance)
 - **WindowsUpdate-Maintenance**: Runs on Patch Tuesday at 1:00 AM
 - **WindowsUpdate-Retry**: Runs daily at 2:00 AM if the main task fails
 
 ## 📝 Logging
 
 All operations are logged to:
-<<<<<<< HEAD
 
-=======
->>>>>>> 812fb49 (Implement code changes to enhance functionality and improve performance)
 - Windows Event Log (Application log, Source: `WindowsUpdateScript`)
 - Console output
 - Dashboard (if enabled)
@@ -118,9 +109,80 @@ All operations are logged to:
 - Uses secure execution policies
 - No external network access required after deployment
 
-## 🤝 Contributing
+<!-- Contributing section moved to bottom to avoid duplication -->
 
-Contributions are welcome! Please submit issues and pull requests on GitHub.
+## 🧪 Testing
+
+The script includes a comprehensive test suite to validate functionality:
+
+```powershell
+# Run all tests
+.\test-windows-update-script.ps1 -RunAll
+
+# Run basic validation tests
+.\test-windows-update-script.ps1 -RunBasicTests -ShowDetails
+
+# Run function and syntax tests
+.\test-windows-update-script.ps1 -RunFunctionTests
+```
+
+The test suite validates:
+
+- PowerShell syntax and structure
+- Required function definitions
+- File dependencies and integrity
+- System requirements
+- Parameter validation
+- Logging functionality
+
+## ⚙️ Configuration
+
+The script supports an optional configuration file (`windows-update-config.json`) for customizing behavior:
+
+- **Update Settings**: Control which update types to install
+- **Scheduling Options**: Customize Patch Tuesday timing
+- **Dashboard Settings**: Configure monitoring interface
+- **Security Options**: Set download validation rules
+- **Notification Settings**: Configure email alerts (if implemented)
+
+## 📁 Project Structure
+
+```text
+Windows-Update-Script/
+├── windows-update-script.ps1          # Main update script
+├── windows-update-dashboard.html      # Real-time monitoring dashboard
+├── windows-update-config.json         # Optional configuration file
+├── win11allow.ps1                     # Windows 11 upgrade bypass helper
+├── test-windows-update-script.ps1     # Test suite for validation
+└── README.md                          # This documentation
+```
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+1. **PowerShell Execution Policy**: Run `Set-ExecutionPolicy Bypass -Scope CurrentUser`
+2. **Missing PSWindowsUpdate**: Script will auto-install the module
+3. **Admin Rights**: Script automatically elevates privileges when needed
+4. **Network Connectivity**: Ensure access to Windows Update and Winget sources
+
+### Log Locations
+
+- **Main Log**: `C:\Scripts\WindowsUpdateLog.txt`
+- **Event Viewer**: Application log, Source: "WindowsUpdateScript"
+- **Dashboard Status**: `C:\Scripts\update-status.json`
+
+## 📈 Version History
+
+### v2.1.0 - Enhanced Bulletproof Edition
+
+- Added comprehensive dashboard with real-time monitoring
+- Implemented process-conflict resolution for application updates
+- Enhanced error handling and logging
+- Added Windows 11 feature upgrade support
+- Included automated testing framework
+- Added configuration file support
+- Improved self-deployment and update mechanism
 
 ## 📜 License
 
@@ -129,3 +191,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 For issues and feature requests, please open an issue on the GitHub repository.
+
+## 🤝 Contributing
+
+1. Run the test suite before submitting changes
+2. Ensure all tests pass with `./test-windows-update-script.ps1 -RunAll`
+3. Follow PowerShell best practices and maintain existing code style
+4. Update documentation for any new features
