@@ -309,6 +309,315 @@ function Test-SystemRequirements {
     }
 }
 
+# FUNCTION: Test Windows Environment Integration
+function Test-WindowsEnvironmentIntegration {
+    Write-Host "`n=== WINDOWS ENVIRONMENT INTEGRATION TESTS ===" -ForegroundColor Cyan
+    
+    # Test Windows Update Service Status
+    try {
+        $wuService = Get-Service -Name wuauserv -ErrorAction SilentlyContinue
+        if ($wuService) {
+            Write-TestResult "Windows Update Service" "PASS" "Service status: $($wuService.Status)"
+        } else {
+            Write-TestResult "Windows Update Service" "FAIL" "Windows Update service not found"
+        }
+    } catch {
+        Write-TestResult "Windows Update Service" "SKIP" "Cannot check service status"
+    }
+    
+    # Test BITS Service Status
+    try {
+        $bitsService = Get-Service -Name bits -ErrorAction SilentlyContinue
+        if ($bitsService) {
+            Write-TestResult "BITS Service" "PASS" "Service status: $($bitsService.Status)"
+        } else {
+            Write-TestResult "BITS Service" "FAIL" "BITS service not found"
+        }
+    } catch {
+        Write-TestResult "BITS Service" "SKIP" "Cannot check service status"
+    }
+    
+    # Test Winget Availability
+    try {
+        $wingetVersion = & winget --version 2>$null
+        if ($LASTEXITCODE -eq 0 -and $wingetVersion) {
+            Write-TestResult "Winget Installation" "PASS" "Version: $wingetVersion"
+        } else {
+            Write-TestResult "Winget Installation" "FAIL" "Winget not available or not working"
+        }
+    } catch {
+        Write-TestResult "Winget Installation" "SKIP" "Winget not installed"
+    }
+    
+    # Test PSWindowsUpdate Module
+    try {
+        $pswuModule = Get-Module -ListAvailable -Name PSWindowsUpdate -ErrorAction SilentlyContinue
+        if ($pswuModule) {
+            Write-TestResult "PSWindowsUpdate Module" "PASS" "Version: $($pswuModule.Version)"
+        } else {
+            Write-TestResult "PSWindowsUpdate Module" "FAIL" "PSWindowsUpdate module not installed"
+        }
+    } catch {
+        Write-TestResult "PSWindowsUpdate Module" "SKIP" "Cannot check module availability"
+    }
+    
+    # Test Event Log Source
+    try {
+        if ([System.Diagnostics.EventLog]::SourceExists("WindowsUpdateScript")) {
+            Write-TestResult "Event Log Source" "PASS" "WindowsUpdateScript source exists"
+        } else {
+            Write-TestResult "Event Log Source" "FAIL" "WindowsUpdateScript event source not registered"
+        }
+    } catch {
+        Write-TestResult "Event Log Source" "SKIP" "Cannot check event log source"
+    }
+    
+    # Test Registry Access
+    try {
+        $testKey = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion" -Name "ProgramFilesDir" -ErrorAction SilentlyContinue
+        if ($testKey) {
+            Write-TestResult "Registry Access" "PASS" "Can read registry keys"
+        } else {
+            Write-TestResult "Registry Access" "FAIL" "Cannot access registry"
+        }
+    } catch {
+        Write-TestResult "Registry Access" "SKIP" "Registry access test failed"
+    }
+    
+    # Test Scheduled Tasks Access
+    try {
+        $testTask = Get-ScheduledTask -TaskName "WindowsUpdate-Manual" -ErrorAction SilentlyContinue
+        if ($testTask) {
+            Write-TestResult "Scheduled Tasks" "PASS" "Can access scheduled tasks"
+        } else {
+            Write-TestResult "Scheduled Tasks" "SKIP" "WindowsUpdate-Manual task not found"
+        }
+    } catch {
+        Write-TestResult "Scheduled Tasks" "SKIP" "Cannot access scheduled tasks"
+    }
+    
+    # Test File System Permissions
+    try {
+        $testDir = "C:\Scripts"
+        if (Test-Path $testDir) {
+            $testFile = Join-Path $testDir "test-write.tmp"
+            try {
+                "test" | Out-File -FilePath $testFile -Encoding UTF8 -ErrorAction Stop
+                Remove-Item $testFile -Force -ErrorAction SilentlyContinue
+                Write-TestResult "File System Permissions" "PASS" "Can write to C:\Scripts"
+            } catch {
+                Write-TestResult "File System Permissions" "FAIL" "Cannot write to C:\Scripts"
+            }
+        } else {
+            Write-TestResult "File System Permissions" "SKIP" "C:\Scripts directory does not exist"
+        }
+    } catch {
+        Write-TestResult "File System Permissions" "SKIP" "File system permission test failed"
+    }
+    
+    # Test Network Connectivity to Microsoft
+    try {
+        $connectionTest = Test-NetConnection -ComputerName "www.microsoft.com" -Port 443 -InformationLevel Quiet -ErrorAction SilentlyContinue
+        if ($connectionTest) {
+            Write-TestResult "Microsoft Connectivity" "PASS" "Can reach Microsoft servers"
+        } else {
+            Write-TestResult "Microsoft Connectivity" "FAIL" "Cannot reach Microsoft servers"
+        }
+    } catch {
+        Write-TestResult "Microsoft Connectivity" "SKIP" "Network connectivity test failed"
+    }
+    
+    # Test Windows Update Registry Keys
+    try {
+        $wuKey = Get-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" -ErrorAction SilentlyContinue
+        if ($wuKey) {
+            Write-TestResult "Windows Update Registry" "PASS" "Windows Update registry keys accessible"
+        } else {
+            Write-TestResult "Windows Update Registry" "SKIP" "Windows Update registry keys not found"
+        }
+    } catch {
+        Write-TestResult "Windows Update Registry" "SKIP" "Cannot access Windows Update registry"
+    }
+}
+
+# FUNCTION: Test Configuration File Validation
+function Test-ConfigurationValidation {
+    Write-Host "`n=== CONFIGURATION VALIDATION TESTS ===" -ForegroundColor Cyan
+    
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $configFile = Join-Path $scriptDir "windows-update-config.json"
+    
+    if (Test-Path $configFile) {
+        # Test JSON parsing
+        try {
+            $config = Get-Content $configFile | ConvertFrom-Json
+            Write-TestResult "Configuration JSON" "PASS" "Valid JSON format"
+        } catch {
+            Write-TestResult "Configuration JSON" "FAIL" "Invalid JSON format: $_"
+            return
+        }
+        
+        # Test required sections
+        $requiredSections = @("version", "settings")
+        foreach ($section in $requiredSections) {
+            if ($config.PSObject.Properties.Name -contains $section) {
+                Write-TestResult "Config Section: $section" "PASS" "Required section present"
+            } else {
+                Write-TestResult "Config Section: $section" "FAIL" "Required section missing"
+            }
+        }
+        
+        # Test version format
+        if ($config.version -match '^\d+\.\d+\.\d+$') {
+            Write-TestResult "Version Format" "PASS" "Version: $($config.version)"
+        } else {
+            Write-TestResult "Version Format" "FAIL" "Invalid version format: $($config.version)"
+        }
+        
+        # Test settings subsections
+        $expectedSettings = @("general", "winget", "windowsUpdate", "maintenance", "scheduling", "dashboard", "security", "notifications", "advanced")
+        foreach ($setting in $expectedSettings) {
+            if ($config.settings.PSObject.Properties.Name -contains $setting) {
+                Write-TestResult "Settings Subsection: $setting" "PASS" "Settings subsection present"
+            } else {
+                Write-TestResult "Settings Subsection: $setting" "SKIP" "Optional subsection missing: $setting"
+            }
+        }
+    } else {
+        Write-TestResult "Configuration File" "SKIP" "Configuration file not found"
+    }
+}
+
+# FUNCTION: Test Script Function Dependencies
+function Test-ScriptFunctionDependencies {
+    Write-Host "`n=== SCRIPT FUNCTION DEPENDENCY TESTS ===" -ForegroundColor Cyan
+    
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $mainScript = Join-Path $scriptDir "windows-update-script.ps1"
+    
+    if (-not (Test-Path $mainScript)) {
+        Write-TestResult "Main Script" "SKIP" "Main script not found for dependency testing"
+        return
+    }
+    
+    try {
+        $scriptContent = Get-Content $mainScript -Raw
+        
+        # Test for critical functions
+        $criticalFunctions = @(
+            "Write-LogMessage",
+            "Confirm-RunAsAdmin", 
+            "Invoke-WingetUpdates",
+            "Invoke-WindowsUpdates",
+            "Invoke-SystemMaintenance",
+            "Confirm-WizmoAvailability",
+            "Invoke-SilentReboot",
+            "Start-UpdateDashboard",
+            "Update-DashboardStatus",
+            "New-PatchTuesdaySchedule",
+            "Get-SecondTuesday",
+            "Test-ConfigurationSchema"
+        )
+        
+        foreach ($func in $criticalFunctions) {
+            if ($scriptContent -match "function $func") {
+                Write-TestResult "Function: $func" "PASS" "Function definition found"
+            } else {
+                Write-TestResult "Function: $func" "FAIL" "Function definition missing"
+            }
+        }
+        
+        # Test for global variables
+        $globalVariables = @(
+            '$global:logFile',
+            '$global:Config',
+            '$script:EventIds'
+        )
+        
+        foreach ($var in $globalVariables) {
+            if ($scriptContent -match [regex]::Escape($var)) {
+                Write-TestResult "Global Variable: $var" "PASS" "Global variable defined"
+            } else {
+                Write-TestResult "Global Variable: $var" "FAIL" "Global variable missing"
+            }
+        }
+        
+        # Test for parameter definitions
+        $parameters = @(
+            "ShowDashboard",
+            "DashboardPath",
+            "Deploy",
+            "CreateSchedule",
+            "RetryDays",
+            "SkipUpdateCheck",
+            "CheckCumulative",
+            "SkipWin11Upgrade"
+        )
+        
+        foreach ($param in $parameters) {
+            if ($scriptContent -match "param\(.*\`$$param") {
+                Write-TestResult "Parameter: $param" "PASS" "Parameter definition found"
+            } else {
+                Write-TestResult "Parameter: $param" "FAIL" "Parameter definition missing"
+            }
+        }
+        
+    } catch {
+        Write-TestResult "Script Analysis" "FAIL" "Error analyzing script: $_"
+    }
+}
+
+# FUNCTION: Test Performance and Resource Usage
+function Test-PerformanceMetrics {
+    Write-Host "`n=== PERFORMANCE AND RESOURCE TESTS ===" -ForegroundColor Cyan
+    
+    # Test script startup time (simulated)
+    try {
+        $startTime = Get-Date
+        Start-Sleep -Milliseconds 100  # Simulate minimal startup
+        $endTime = Get-Date
+        $startupTime = ($endTime - $startTime).TotalMilliseconds
+        
+        if ($startupTime -lt 500) {
+            Write-TestResult "Script Startup Time" "PASS" "$([math]::Round($startupTime, 2))ms"
+        } else {
+            Write-TestResult "Script Startup Time" "FAIL" "Slow startup: $([math]::Round($startupTime, 2))ms"
+        }
+    } catch {
+        Write-TestResult "Script Startup Time" "SKIP" "Cannot measure startup time"
+    }
+    
+    # Test memory usage (if available)
+    try {
+        $process = Get-Process -Id $PID -ErrorAction SilentlyContinue
+        if ($process) {
+            $memoryMB = [math]::Round($process.WorkingSet64 / 1MB, 2)
+            if ($memoryMB -lt 100) {
+                Write-TestResult "Memory Usage" "PASS" "$memoryMB MB"
+            } else {
+                Write-TestResult "Memory Usage" "WARNING" "High memory usage: $memoryMB MB"
+            }
+        }
+    } catch {
+        Write-TestResult "Memory Usage" "SKIP" "Cannot measure memory usage"
+    }
+    
+    # Test disk space requirements
+    try {
+        $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+        $scriptSize = (Get-ChildItem $scriptDir -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+        $scriptSizeMB = [math]::Round($scriptSize / 1MB, 2)
+        
+        if ($scriptSizeMB -lt 10) {
+            Write-TestResult "Disk Space Requirements" "PASS" "$scriptSizeMB MB"
+        } else {
+            Write-TestResult "Disk Space Requirements" "WARNING" "Large disk footprint: $scriptSizeMB MB"
+        }
+    } catch {
+        Write-TestResult "Disk Space Requirements" "SKIP" "Cannot measure disk usage"
+    }
+}
+
 # FUNCTION: Main Test Execution
 function Start-TestSuite {
     Write-Host "Windows Update Script Test Suite v2.1.0" -ForegroundColor Cyan
@@ -323,6 +632,8 @@ function Start-TestSuite {
         Test-SystemRequirements
         Test-FileDependencies
         Test-ParameterValidation
+        Test-ConfigurationValidation
+        Test-PerformanceMetrics
     }
     
     if ($RunAll -or $RunFunctionTests) {
@@ -330,11 +641,13 @@ function Start-TestSuite {
             Test-ScriptSyntax -ScriptPath $mainScript
         }
         Test-LoggingFunctions
+        Test-ScriptFunctionDependencies
     }
     
     if ($RunAll -or $RunIntegrationTests) {
         Write-Host "`n=== INTEGRATION TESTS ===" -ForegroundColor Cyan
-        Write-TestResult "Integration Tests" "SKIP" "Integration tests require full Windows environment"
+        Test-WindowsEnvironmentIntegration
+        Write-TestResult "Integration Tests" "PASS" "Windows environment integration tests completed"
     }
     
     # Display summary

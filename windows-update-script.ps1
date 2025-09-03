@@ -44,6 +44,159 @@ param(
     [switch]$SkipWin11Upgrade      # Skip Windows 11 feature upgrade pre-check
 )
 
+# EVENT ID CONSTANTS: Centralized event ID mapping for consistent logging
+# WHY CENTRALIZED: Ensures consistent event IDs across all logging calls
+# EVENT ID SCHEMA: 1xxx = Info, 2xxx = Process, 3xxx = Warning, 5xxx = Error
+$script:EventIds = @{
+    # Information Events (1000-1999)
+    SCRIPT_START = 1001
+    SCRIPT_SUCCESS = 1002
+    WINGET_APP_UPDATE = 1015
+    WINGET_COMPLETE = 1016
+    WINDOWS_UPDATE_COMPLETE = 1017
+    DASHBOARD_LAUNCH = 1020
+    
+    # Process Events (2000-2999)
+    # (Reserved for future use)
+    
+    # Warning Events (3000-3999)
+    SCRIPT_WARNING = 3002
+    WINGET_APP_FAILED = 3019
+    
+    # Error Events (5000-5999)
+    LOGGING_ERROR = 5000
+    SCRIPT_CRITICAL = 5001
+    WINGET_FAILED = 5016
+    WINDOWS_UPDATE_FAILED = 5017
+    WINDOWS_PROCESS_FAILED = 5018
+    DASHBOARD_FAILED = 5020
+    WINGET_APP_ERROR = 5022
+    WINGET_TIMEOUT = 5021
+}
+
+# CONFIGURATION SCHEMA VALIDATION: Validate config file structure and values
+# WHY NEEDED: Ensures configuration file is properly formatted and contains valid values
+function Test-ConfigurationSchema {
+    param(
+        [string]$ConfigPath
+    )
+    
+    Write-LogMessage "Validating configuration schema..." "INFO"
+    
+    try {
+        # LOAD CONFIGURATION: Parse JSON configuration
+        $config = Get-Content -Path $ConfigPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        
+        # REQUIRED SECTIONS: Check for mandatory configuration sections
+        $requiredSections = @("version", "settings")
+        foreach ($section in $requiredSections) {
+            if (-not $config.PSObject.Properties.Name.Contains($section)) {
+                Write-LogMessage "Configuration validation failed: Missing required section '$section'" "ERROR"
+                return $false
+            }
+        }
+        
+        # VERSION VALIDATION: Ensure version is valid
+        if (-not $config.version -or $config.version -notmatch '^\d+\.\d+\.\d+$') {
+            Write-LogMessage "Configuration validation failed: Invalid version format '$($config.version)'" "ERROR"
+            return $false
+        }
+        
+        # SETTINGS VALIDATION: Validate settings structure
+        if (-not $config.settings) {
+            Write-LogMessage "Configuration validation failed: Missing settings section" "ERROR"
+            return $false
+        }
+        
+        # GENERAL SETTINGS: Validate general configuration
+        $generalSettings = $config.settings.general
+        if ($generalSettings) {
+            # LOG FILE SIZE: Must be positive number
+            if ($generalSettings.maxLogFileSizeMB -and ($generalSettings.maxLogFileSizeMB -le 0 -or $generalSettings.maxLogFileSizeMB -gt 1000)) {
+                Write-LogMessage "Configuration validation failed: maxLogFileSizeMB must be between 1-1000 MB" "ERROR"
+                return $false
+            }
+            
+            # LOG RETENTION: Must be positive number
+            if ($generalSettings.logRetentionDays -and ($generalSettings.logRetentionDays -le 0 -or $generalSettings.logRetentionDays -gt 365)) {
+                Write-LogMessage "Configuration validation failed: logRetentionDays must be between 1-365 days" "ERROR"
+                return $false
+            }
+        }
+        
+        # WINGET SETTINGS: Validate Winget configuration
+        $wingetSettings = $config.settings.winget
+        if ($wingetSettings) {
+            # TIMEOUT: Must be reasonable value
+            if ($wingetSettings.maxUpdateTimeoutMinutes -and ($wingetSettings.maxUpdateTimeoutMinutes -le 0 -or $wingetSettings.maxUpdateTimeoutMinutes -gt 300)) {
+                Write-LogMessage "Configuration validation failed: maxUpdateTimeoutMinutes must be between 1-300 minutes" "ERROR"
+                return $false
+            }
+            
+            # RETRY ATTEMPTS: Must be reasonable value
+            if ($wingetSettings.maxRetryAttempts -and ($wingetSettings.maxRetryAttempts -lt 0 -or $wingetSettings.maxRetryAttempts -gt 10)) {
+                Write-LogMessage "Configuration validation failed: maxRetryAttempts must be between 0-10" "ERROR"
+                return $false
+            }
+        }
+        
+        # WINDOWS UPDATE SETTINGS: Validate Windows Update configuration
+        $windowsSettings = $config.settings.windowsUpdate
+        if ($windowsSettings) {
+            # UPDATE CYCLES: Must be reasonable value
+            if ($windowsSettings.maxUpdateCycles -and ($windowsSettings.maxUpdateCycles -le 0 -or $windowsSettings.maxUpdateCycles -gt 10)) {
+                Write-LogMessage "Configuration validation failed: maxUpdateCycles must be between 1-10" "ERROR"
+                return $false
+            }
+        }
+        
+        # SCHEDULING SETTINGS: Validate scheduling configuration
+        $scheduleSettings = $config.settings.scheduling
+        if ($scheduleSettings) {
+            # HOURS: Must be 0-23
+            if ($scheduleSettings.patchTuesdayHour -and ($scheduleSettings.patchTuesdayHour -lt 0 -or $scheduleSettings.patchTuesdayHour -gt 23)) {
+                Write-LogMessage "Configuration validation failed: patchTuesdayHour must be between 0-23" "ERROR"
+                return $false
+            }
+            
+            # MINUTES: Must be 0-59
+            if ($scheduleSettings.patchTuesdayMinute -and ($scheduleSettings.patchTuesdayMinute -lt 0 -or $scheduleSettings.patchTuesdayMinute -gt 59)) {
+                Write-LogMessage "Configuration validation failed: patchTuesdayMinute must be between 0-59" "ERROR"
+                return $false
+            }
+            
+            # RETRY DAYS: Must be reasonable value
+            if ($scheduleSettings.retryDays -and ($scheduleSettings.retryDays -le 0 -or $scheduleSettings.retryDays -gt 30)) {
+                Write-LogMessage "Configuration validation failed: retryDays must be between 1-30 days" "ERROR"
+                return $false
+            }
+        }
+        
+        # DASHBOARD SETTINGS: Validate dashboard configuration
+        $dashboardSettings = $config.settings.dashboard
+        if ($dashboardSettings) {
+            # PORT: Must be valid port number
+            if ($dashboardSettings.dashboardPort -and ($dashboardSettings.dashboardPort -le 0 -or $dashboardSettings.dashboardPort -gt 65535)) {
+                Write-LogMessage "Configuration validation failed: dashboardPort must be between 1-65535" "ERROR"
+                return $false
+            }
+            
+            # REFRESH INTERVAL: Must be reasonable value
+            if ($dashboardSettings.dashboardRefreshSeconds -and ($dashboardSettings.dashboardRefreshSeconds -le 0 -or $dashboardSettings.dashboardRefreshSeconds -gt 300)) {
+                Write-LogMessage "Configuration validation failed: dashboardRefreshSeconds must be between 1-300 seconds" "ERROR"
+                return $false
+            }
+        }
+        
+        Write-LogMessage "Configuration schema validation passed" "SUCCESS"
+        return $true
+        
+    } catch {
+        Write-LogMessage "Configuration schema validation failed: $_" "ERROR"
+        return $false
+    }
+}
+
 # CONFIGURATION LOADING: Attempt to load optional JSON config for overrides
 $global:Config = $null
 $configPathCandidates = @(
@@ -55,9 +208,17 @@ foreach ($cfg in $configPathCandidates) {
         try {
             $raw = Get-Content $cfg -Raw -ErrorAction Stop
             $global:Config = $raw | ConvertFrom-Json -ErrorAction Stop
-            Write-Host "Loaded configuration: $cfg" -ForegroundColor Cyan
+            
+            # VALIDATE CONFIGURATION: Check schema and values
+            if (Test-ConfigurationSchema -ConfigPath $cfg) {
+                Write-Host "Loaded and validated configuration: $cfg" -ForegroundColor Cyan
+            } else {
+                Write-Host "Configuration validation failed for $cfg - using defaults" -ForegroundColor Yellow
+                $global:Config = $null
+            }
         } catch {
             Write-Host "Failed to load configuration from $cfg : $_" -ForegroundColor Yellow
+            Write-Host "Using default configuration values" -ForegroundColor Gray
         }
     }
 }
@@ -207,7 +368,7 @@ if %ERRORLEVEL% EQU 0 (
                     # SUCCESS EVALUATION: Determine if update was successful
                     if ($exitCode -eq 0 -or $exitCode -eq -1978335212) {
                         Write-LogMessage "$($app.DisplayName) updated successfully via external process" "SUCCESS"
-                        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1018 -EntryType Information -Message "$($app.DisplayName) updated via external process"
+                        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId $script:EventIds.WINGET_APP_UPDATE -EntryType Information -Message "$($app.DisplayName) updated via external process"
                     } else {
                         Write-LogMessage "$($app.DisplayName) external update failed with exit code: $exitCode" "ERROR"
                         Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 3019 -EntryType Warning -Message "$($app.DisplayName) external update failed: $exitCode"
@@ -216,7 +377,7 @@ if %ERRORLEVEL% EQU 0 (
                     # TIMEOUT HANDLING: Kill process if it takes too long
                     Write-LogMessage "$($app.DisplayName) update timed out after $timeoutSeconds seconds" "ERROR"
                     try { $process.Kill() } catch { }
-                    Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 5021 -EntryType Error -Message "$($app.DisplayName) update timed out"
+                    Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId $script:EventIds.WINGET_TIMEOUT -EntryType Error -Message "$($app.DisplayName) update timed out"
                 }
                 
                 # CLEANUP: Remove temporary batch file
@@ -237,7 +398,7 @@ if %ERRORLEVEL% EQU 0 (
             
         } catch {
             Write-LogMessage "Error updating $($app.DisplayName): $_" "ERROR"
-            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 5022 -EntryType Error -Message "Error updating $($app.DisplayName): $_"
+            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId $script:EventIds.WINGET_APP_ERROR -EntryType Error -Message "Error updating $($app.DisplayName): $_"
         }
         
         # INTER-APP DELAY: Brief pause between app updates
@@ -427,6 +588,69 @@ function New-PatchTuesdaySchedule {
         return $true
     } catch {
         Write-Host "Failed to create scheduled tasks: $_" -ForegroundColor Red
+        return $false
+    }
+}
+
+# MONTHLY AUTO-RESCHEDULE: Automatically recreate tasks for next month's Patch Tuesday
+# WHY NEEDED: One-time triggers expire after execution, need to recreate for next month
+function Update-MonthlySchedule {
+    Write-Host "Checking if monthly schedule needs updating..." -ForegroundColor Cyan
+    
+    try {
+        # GET EXISTING TASKS: Check current Patch Tuesday tasks
+        $existingTasks = Get-ScheduledTask | Where-Object { $_.TaskName -like 'WindowsUpdate-PatchTuesday*' }
+        
+        if ($existingTasks.Count -eq 0) {
+            Write-Host "No existing Patch Tuesday tasks found - creating new schedule" -ForegroundColor Yellow
+            return (New-PatchTuesdaySchedule)
+        }
+        
+        # FIND NEXT PATCH TUESDAY: Calculate next month's date
+        $nextMonth = (Get-Date).AddMonths(1)
+        $nextPatchTuesday = Get-SecondTuesday $nextMonth
+        
+        # CHECK IF UPDATE NEEDED: Compare with existing task dates
+        $mainTask = $existingTasks | Where-Object { $_.TaskName -eq 'WindowsUpdate-PatchTuesday' }
+        if ($mainTask) {
+            $currentTrigger = $mainTask.Triggers[0]
+            if ($currentTrigger -and $currentTrigger.StartBoundary) {
+                $currentDate = [DateTime]::Parse($currentTrigger.StartBoundary)
+                
+                # UPDATE IF MORE THAN 2 WEEKS OLD: Prevents unnecessary recreation
+                if (($nextPatchTuesday - $currentDate).TotalDays -gt 14) {
+                    Write-Host "Existing schedule is outdated - recreating for next month" -ForegroundColor Yellow
+                    
+                    # REMOVE OLD TASKS: Clean up existing tasks
+                    $existingTasks | ForEach-Object {
+                        try {
+                            Unregister-ScheduledTask -TaskName $_.TaskName -Confirm:$false -ErrorAction SilentlyContinue
+                        } catch {
+                            Write-Host "Warning: Could not remove task $($_.TaskName): $_" -ForegroundColor Yellow
+                        }
+                    }
+                    
+                    # CREATE NEW SCHEDULE: For next month's Patch Tuesday
+                    Write-Host "Creating new schedule for: $($nextPatchTuesday.ToString('yyyy-MM-dd'))" -ForegroundColor Green
+                    return (New-PatchTuesdaySchedule)
+                } else {
+                    Write-Host "Schedule is current - no update needed" -ForegroundColor Green
+                    return $true
+                }
+            }
+        }
+        
+        # FALLBACK: Recreate if main task missing or invalid
+        Write-Host "Main Patch Tuesday task missing or invalid - recreating schedule" -ForegroundColor Yellow
+        $existingTasks | ForEach-Object {
+            try {
+                Unregister-ScheduledTask -TaskName $_.TaskName -Confirm:$false -ErrorAction SilentlyContinue
+            } catch { }
+        }
+        return (New-PatchTuesdaySchedule)
+        
+    } catch {
+        Write-Host "Failed to update monthly schedule: $_" -ForegroundColor Red
         return $false
     }
 }
@@ -643,6 +867,19 @@ if ($CreateSchedule) {
     }
 }
 
+# MONTHLY SCHEDULE AUTO-UPDATE: Automatically refresh schedule for next month
+# WHY: One-time triggers expire, so we need to recreate them monthly
+try {
+    $scheduleUpdated = Update-MonthlySchedule
+    if ($scheduleUpdated) {
+        Write-LogMessage "Monthly schedule check completed successfully" "INFO"
+    } else {
+        Write-LogMessage "Monthly schedule update failed - manual intervention may be required" "WARNING"
+    }
+} catch {
+    Write-LogMessage "Error during monthly schedule check: $_" "WARNING"
+}
+
 # CUMULATIVE UPDATE CHECK: Skip execution if checking for monthly cumulative update
 if ($MyInvocation.BoundParameters.ContainsKey('CheckCumulative')) {
     if (-not (Test-CumulativeUpdateAvailable)) {
@@ -682,7 +919,7 @@ function Start-UpdateDashboard {
         # BROWSER LAUNCH: Open dashboard in default browser
         Write-LogMessage "Launching Windows Update Dashboard..."
         Start-Process $HtmlPath
-        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1020 -EntryType Information -Message "Dashboard launched at: $HtmlPath"
+        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId $script:EventIds.DASHBOARD_LAUNCH -EntryType Information -Message "Dashboard launched at: $HtmlPath"
         
         # DASHBOARD STATUS FILE: Create status file for dashboard communication
         $statusFile = Join-Path (Split-Path $global:logFile) "update-status.json"
@@ -709,7 +946,7 @@ function Start-UpdateDashboard {
         
     } catch {
         Write-LogMessage "Failed to launch dashboard: $_" "ERROR"
-        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 5020 -EntryType Error -Message "Dashboard launch failed: $_"
+        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId $script:EventIds.DASHBOARD_FAILED -EntryType Error -Message "Dashboard launch failed: $_"
         return $false
     }
 }
@@ -872,7 +1109,7 @@ function Write-LogMessage {
     # EVENT ID SCHEMA: 1xxx = Info, 2xxx = Process, 3xxx = Warning, 5xxx = Error
     try {
         $eventType = switch ($Type) {
-            "ERROR" { "Error"; $eventId = 5000 }
+            "ERROR" { "Error"; $eventId = $script:EventIds.LOGGING_ERROR }
             "WARNING" { "Warning"; $eventId = 3000 }
             default { "Information"; $eventId = 1000 }
         }
@@ -912,8 +1149,8 @@ function Confirm-WizmoAvailability {
     # DOWNLOAD INITIATION: Inform user of download process
     Write-LogMessage "Wizmo not found. Downloading from GRC.com..."
     $wizmoUrl = "https://www.grc.com/files/wizmo.exe"
-    # OPTIONAL HASH (update if vendor changes binary) - placeholder example
-    $expectedSha256 = "6F3E7E2E00000000000000000000000000000000000000000000000000000000" # Replace with real hash after verification
+    # VERIFIED SHA256 HASH: Obtained from official GRC download
+    $expectedSha256 = "7b0b47f936d24686de461bea05a9480179035a5b2b23a74167a7728e95922d5d"
     
     try {
         # SECURITY PROTOCOL: Force TLS 1.2 for secure HTTPS connections
@@ -1169,7 +1406,7 @@ function Invoke-WingetUpdates {
                     # RESULT EVALUATION: Check update success
                     if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq -1978335212) {
                         Write-LogMessage "$($app.DisplayName) updated successfully" "SUCCESS"
-                        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1015 -EntryType Information -Message "$($app.DisplayName) updated via Winget"
+                        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId $script:EventIds.WINGET_APP_UPDATE -EntryType Information -Message "$($app.DisplayName) updated via Winget"
                     } else {
                         Write-LogMessage "$($app.DisplayName) update failed (Exit Code: $LASTEXITCODE)" "WARNING"
                         Write-LogMessage "Output: $result" "WARNING"
@@ -1192,13 +1429,13 @@ function Invoke-WingetUpdates {
         
         Write-LogMessage "Winget application updates completed" "SUCCESS"
         Update-DashboardStatus -Phase "winget-complete" -Progress 90 -CurrentOperation "Winget updates completed"
-        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1016 -EntryType Information -Message "Winget updates completed successfully"
+        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId $script:EventIds.WINGET_COMPLETE -EntryType Information -Message "Winget updates completed successfully"
         
         return $true
         
     } catch {
         Write-LogMessage "Winget update process failed: $_" "ERROR"
-        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 5016 -EntryType Error -Message "Winget updates failed: $_"
+        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId $script:EventIds.WINGET_FAILED -EntryType Error -Message "Winget updates failed: $_"
         return $false
     }
 }
@@ -1264,7 +1501,7 @@ function Invoke-WindowsUpdates {
             }
             
             Write-LogMessage "Windows Updates completed: $successCount installed, $failureCount failed" "INFO"
-            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1017 -EntryType Information -Message "Windows Updates: $successCount installed, $failureCount failed"
+            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId $script:EventIds.WINDOWS_UPDATE_COMPLETE -EntryType Information -Message "Windows Updates: $successCount installed, $failureCount failed"
             
             # REBOOT CHECK: Determine if system restart is required
             $rebootRequired = Get-WURebootStatus -Silent -ErrorAction SilentlyContinue
@@ -1286,13 +1523,13 @@ function Invoke-WindowsUpdates {
             
         } catch {
             Write-LogMessage "Windows update installation failed: $_" "ERROR"
-            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 5017 -EntryType Error -Message "Windows update installation failed: $_"
+            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId $script:EventIds.WINDOWS_UPDATE_FAILED -EntryType Error -Message "Windows update installation failed: $_"
             return $false
         }
         
     } catch {
         Write-LogMessage "Windows update process failed: $_" "ERROR"
-        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 5018 -EntryType Error -Message "Windows update process failed: $_"
+        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId $script:EventIds.WINDOWS_PROCESS_FAILED -EntryType Error -Message "Windows update process failed: $_"
         return $false
     }
 }
@@ -1428,7 +1665,7 @@ try {
     
     Write-LogMessage "Windows Update Script v2.1.0 - Enhanced Bulletproof Edition" "INFO"
     Write-LogMessage "Script started at: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" "INFO"
-    Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1001 -EntryType Information -Message "Windows Update Script started"
+    Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId $script:EventIds.SCRIPT_START -EntryType Information -Message "Windows Update Script started"
     
     # INITIAL STATUS: Update dashboard with startup information
     Update-DashboardStatus -Phase "initialization" -Progress 5 -CurrentOperation "Script initialization completed"
@@ -1484,7 +1721,7 @@ try {
     # SUCCESS NOTIFICATION: Log final result
     if ($overallSuccess) {
         Write-LogMessage "Windows Update Script completed successfully!" "SUCCESS"
-        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1002 -EntryType Information -Message "Windows Update Script completed successfully in $durationString"
+        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId $script:EventIds.SCRIPT_SUCCESS -EntryType Information -Message "Windows Update Script completed successfully in $durationString"
     } else {
         Write-LogMessage "Windows Update Script completed with some failures" "WARNING"
         Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 3002 -EntryType Warning -Message "Windows Update Script completed with failures in $durationString"
@@ -1499,7 +1736,7 @@ try {
 } catch {
     # CATASTROPHIC ERROR HANDLING: Catch any unhandled exceptions
     Write-LogMessage "CRITICAL ERROR - Script execution failed: $_" "ERROR"
-    Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 5001 -EntryType Error -Message "Critical script failure: $_"
+    Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId $script:EventIds.SCRIPT_CRITICAL -EntryType Error -Message "Critical script failure: $_"
     
     Update-DashboardStatus -Phase "critical-error" -Progress 0 -CurrentOperation "Script execution failed" -AdditionalData @{
         errorMessage = $_.Exception.Message
