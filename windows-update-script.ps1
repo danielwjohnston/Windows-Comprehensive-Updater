@@ -421,15 +421,7 @@ function New-PatchTuesdaySchedule {
         Register-ScheduledTask -TaskName "WindowsUpdate-Manual" -Action $manualAction -Principal $principal -Settings $settings -Force | Out-Null
         Write-Host " Manual run task created" -ForegroundColor Green
 
-        # Self-rescheduling script block appended to main action via a secondary scheduled task
-        $rescheduleScript = @"
-            try {
-                `"$scriptPath`" -CheckCumulative | Out-Null
-                # Recreate next month's tasks
-                powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "`"& { Import-Module ScheduledTasks; (Get-Content -Raw -Path '$scriptPath') >$null }`" | Out-Null
-            } catch {}
-"@
-        # (Future enhancement placeholder for auto-reschedule)
+# (Future enhancement placeholder for auto-reschedule)
 
         Write-Host "Patch Tuesday automation configured successfully (one-time triggers)." -ForegroundColor Cyan
         return $true
