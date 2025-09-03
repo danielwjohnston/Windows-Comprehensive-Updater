@@ -944,6 +944,155 @@ function Start-UpdateDashboard {
         return $false
     }
 }
+# FUNCTION: Send Email Notifications
+function Send-EmailNotification {
+    param(
+        [string]$Subject,
+        [string]$Body,
+        [string]$Type = "INFO"
+    )
+    
+    if (-not $global:Config.settings.notifications.enableEmailNotifications) {
+        return $true
+    }
+    
+    try {
+        $smtpServer = $global:Config.settings.notifications.smtpServer
+        $smtpPort = $global:Config.settings.notifications.smtpPort
+        $from = $global:Config.settings.notifications.emailFrom
+        $to = $global:Config.settings.notifications.emailTo
+        
+        if (-not $smtpServer -or -not $from -or $to.Count -eq 0) {
+            Write-LogMessage "Email notification not configured properly" "WARNING"
+            return $false
+        }
+        
+        $emailBody = @"
+Windows Comprehensive Updater Notification
+
+Type: $Type
+Time: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+Computer: $env:COMPUTERNAME
+User: $env:USERNAME
+
+$Body
+
+---
+Windows Comprehensive Updater v2.1.0
+"@
+        
+        Send-MailMessage -From $from -To $to -Subject $Subject -Body $emailBody -SmtpServer $smtpServer -Port $smtpPort -UseSsl
+        Write-LogMessage "Email notification sent successfully" "INFO"
+        return $true
+    } catch {
+        Write-LogMessage "Failed to send email notification: $_" "ERROR"
+        return $false
+    }
+}
+
+# FUNCTION: Create System Backup Before Updates
+function New-SystemBackup {
+    param(
+        [string]$BackupPath = ""
+    )
+    
+    if (-not $global:Config.settings.advanced.enableBackupBeforeUpdates) {
+        Write-LogMessage "System backup disabled in configuration" "INFO"
+        return $true
+    }
+    
+    try {
+        if (-not $BackupPath) {
+            $BackupPath = $global:Config.settings.advanced.backupLocation
+        }
+        
+        if (-not (Test-Path $BackupPath)) {
+            New-Item -ItemType Directory -Path $BackupPath -Force | Out-Null
+        }
+        
+        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+        $backupName = "WindowsUpdate_Backup_$timestamp"
+        $fullBackupPath = Join-Path $BackupPath $backupName
+        
+        Write-LogMessage "Creating system restore point..." "INFO"
+        Checkpoint-Computer -Description "Windows Comprehensive Updater - Pre-Update Backup" -RestorePointType "MODIFY_SETTINGS" -ErrorAction Stop
+        
+        Write-LogMessage "System backup completed successfully" "SUCCESS"
+        return $true
+    } catch {
+        Write-LogMessage "System backup failed: $_" "ERROR"
+        return $false
+    }
+}
+
+# FUNCTION: Enhanced System Maintenance Tasks
+function Invoke-EnhancedMaintenance {
+    Write-LogMessage "Starting enhanced system maintenance..." "INFO"
+    
+    try {
+        # System File Checker
+        if ($global:Config.settings.maintenance.runSystemFileChecker) {
+            Write-LogMessage "Running System File Checker..." "INFO"
+            $sfcResult = sfc /scannow
+            if ($LASTEXITCODE -eq 0) {
+                Write-LogMessage "System File Checker completed successfully" "SUCCESS"
+            } else {
+                Write-LogMessage "System File Checker found issues" "WARNING"
+            }
+        }
+        
+        # Disk Cleanup
+        if ($global:Config.settings.maintenance.performDiskCleanup) {
+            Write-LogMessage "Running Disk Cleanup..." "INFO"
+            $drives = Get-WmiObject -Class Win32_LogicalDisk | Where-Object { $_.DriveType -eq 3 }
+            foreach ($drive in $drives) {
+                try {
+                    $cleanupResult = cleanmgr /d $($drive.DeviceID.Trim(":")) /sagerun:1
+                    Write-LogMessage "Disk cleanup completed for drive $($drive.DeviceID)" "SUCCESS"
+                } catch {
+                    Write-LogMessage "Disk cleanup failed for drive $($drive.DeviceID): $_" "WARNING"
+                }
+            }
+        }
+        
+        # Disk Defragmentation
+        if ($global:Config.settings.maintenance.defragmentDrives) {
+            Write-LogMessage "Running disk defragmentation..." "INFO"
+            $defragResult = defrag /C /H
+            Write-LogMessage "Disk defragmentation completed" "SUCCESS"
+        }
+        
+        Write-LogMessage "Enhanced system maintenance completed" "SUCCESS"
+        return $true
+    } catch {
+        Write-LogMessage "Enhanced maintenance failed: $_" "ERROR"
+        return $false
+    }
+}
+
+# FUNCTION: System Performance Monitoring
+function Get-SystemPerformanceMetrics {
+    try {
+        $cpu = Get-WmiObject -Class Win32_Processor | Select-Object -First 1
+        $memory = Get-WmiObject -Class Win32_OperatingSystem
+        $disk = Get-WmiObject -Class Win32_LogicalDisk -Filter "DeviceID=C:"
+        
+        $metrics = @{}
+        $metrics.CPUUsage = $cpu.LoadPercentage
+        $metrics.TotalMemoryGB = [math]::Round($memory.TotalVisibleMemorySize / 1MB, 2)
+        $metrics.AvailableMemoryGB = [math]::Round($memory.FreePhysicalMemory / 1MB, 2)
+        $metrics.MemoryUsagePercent = [math]::Round((($memory.TotalVisibleMemorySize - $memory.FreePhysicalMemory) / $memory.TotalVisibleMemorySize) * 100, 2)
+        $metrics.DiskTotalGB = [math]::Round($disk.Size / 1GB, 2)
+        $metrics.DiskFreeGB = [math]::Round($disk.FreeSpace / 1GB, 2)
+        $metrics.DiskUsagePercent = [math]::Round((($disk.Size - $disk.FreeSpace) / $disk.Size) * 100, 2)
+        
+        return $metrics
+    } catch {
+        Write-LogMessage "Failed to collect performance metrics: $_" "ERROR"
+        return $null
+    }
+}
+
 
 # FUNCTION: Update Dashboard Status
 function Update-DashboardStatus {
@@ -1324,6 +1473,15 @@ function Invoke-SystemMaintenance {
             }
         } catch {
             Write-LogMessage "System file check failed: $_" "WARNING"
+        # ENHANCED MAINTENANCE: Run additional maintenance tasks
+        Write-LogMessage "Running enhanced maintenance tasks..." "INFO"
+        Update-DashboardStatus -Phase "enhanced-maintenance" -Progress 90 -CurrentOperation "Running enhanced maintenance"
+        $enhancedSuccess = Invoke-EnhancedMaintenance
+        if ($enhancedSuccess) {
+            Write-LogMessage "Enhanced maintenance completed successfully" "SUCCESS"
+        } else {
+            Write-LogMessage "Some enhanced maintenance tasks failed" "WARNING"
+        }
         }
         
         Write-LogMessage "System maintenance completed" "SUCCESS"
@@ -1387,6 +1545,21 @@ try {
     Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId $script:EventIds.SCRIPT_START -EntryType Information -Message "Windows Update Script started"
     
     Update-DashboardStatus -Phase "initialization" -Progress 5 -CurrentOperation "Script initialization completed"
+    # PERFORMANCE MONITORING: Capture initial system metrics
+    Write-LogMessage "Capturing initial system performance metrics..." "INFO"
+    $script:initialMetrics = Get-SystemPerformanceMetrics
+    if ($script:initialMetrics) {
+        Write-LogMessage "Initial CPU: $($script:initialMetrics.CPUUsage)% | Memory: $($script:initialMetrics.MemoryUsagePercent)% | Disk: $($script:initialMetrics.DiskUsagePercent)%" "INFO"
+    }
+    
+    # SYSTEM BACKUP: Create backup before updates if enabled
+    Write-LogMessage "=== PHASE 0: SYSTEM BACKUP ===" "INFO"
+    $backupSuccess = New-SystemBackup
+    if ($backupSuccess) {
+        Write-LogMessage "System backup completed successfully" "SUCCESS"
+    } else {
+        Write-LogMessage "System backup failed or was skipped" "WARNING"
+    }
     
     # EXECUTION FLOW
     $wingetSuccess = $true
