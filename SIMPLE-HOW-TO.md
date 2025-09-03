@@ -1,4 +1,4 @@
-# Windows Update Script - Simple How To Guide
+# Windows Comprehensive Updater - Simple How To Guide
 
 ## 🚀 Quick Start (3 Easy Steps)
 
@@ -6,7 +6,7 @@
 
 ```powershell
 # Download the script and run it
-.\windows-update-script.ps1
+.\windows-comprehensive-updater.ps1
 ```
 
 ### Step 2: First Time Setup
@@ -22,13 +22,13 @@ The script will automatically:
 
 ```powershell
 # Option A: Just run updates now
-.\windows-update-script.ps1
+.\windows-comprehensive-updater.ps1
 
 # Option B: Run with monitoring dashboard
-.\windows-update-script.ps1 -ShowDashboard
+.\windows-comprehensive-updater.ps1 -ShowDashboard
 
 # Option C: Set up automatic monthly updates
-.\windows-update-script.ps1 -CreateSchedule
+.\windows-comprehensive-updater.ps1 -CreateSchedule
 ```
 
 ## 📋 What The Script Does
@@ -51,7 +51,7 @@ The script will automatically:
 ### "I want to update my computer right now"
 
 ```powershell
-.\windows-update-script.ps1 -ShowDashboard
+.\windows-comprehensive-updater.ps1 -ShowDashboard
 ```
 
 - Opens a web dashboard to watch progress
@@ -61,7 +61,7 @@ The script will automatically:
 ### "I want automatic monthly updates"
 
 ```powershell
-.\windows-update-script.ps1 -CreateSchedule
+.\windows-comprehensive-updater.ps1 -CreateSchedule
 ```
 
 - Sets up automatic Patch Tuesday updates
@@ -71,7 +71,7 @@ The script will automatically:
 ### "I want to check if updates are available"
 
 ```powershell
-.\windows-update-script.ps1 -CheckCumulative
+.\windows-comprehensive-updater.ps1 -CheckCumulative
 ```
 
 - Only checks for updates, doesn't install them
@@ -121,13 +121,13 @@ Create `windows-update-config.json` to customize:
 
 ```powershell
 # Skip Winget updates
-.\windows-update-script.ps1 -DisableWinget
+.\windows-comprehensive-updater.ps1 -DisableWinget
 
 # Skip Windows updates
-.\windows-update-script.ps1 -DisableWindowsUpdates
+.\windows-comprehensive-updater.ps1 -DisableWindowsUpdates
 
 # Custom retry days
-.\windows-update-script.ps1 -RetryDays 14
+.\windows-comprehensive-updater.ps1 -RetryDays 14
 ```
 
 ## 🔧 Troubleshooting
@@ -161,7 +161,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ```powershell
 # Run the test suite
-.\test-windows-update-script.ps1 -RunAll
+.\test-windows-comprehensive-updater.ps1 -RunAll
 ```
 
 This will check if everything is set up correctly.
@@ -193,4 +193,4 @@ A: Usually 15-45 minutes, depending on how many updates are needed.
 
 ---
 
-**That's it!** The script is designed to be simple - just run it and let it handle the rest. Most users only need the basic command: `.\windows-update-script.ps1`
+**That's it!** The script is designed to be simple - just run it and let it handle the rest. Most users only need the basic command: `.\windows-comprehensive-updater.ps1`

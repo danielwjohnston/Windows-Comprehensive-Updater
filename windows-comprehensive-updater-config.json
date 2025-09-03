@@ -1,6 +1,6 @@
 {
     "version": "2.1.0",
-    "description": "Configuration file for Windows Update Script",
+    "description": "Configuration file for Windows Comprehensive Updater",
     "settings": {
         "general": {
             "enableDetailedLogging": true,
@@ -86,7 +86,7 @@
     },
     "metadata": {
         "lastModified": "2025-09-03T12:00:00Z",
-        "createdBy": "Windows Update Script v2.1.0",
+        "createdBy": "Windows Comprehensive Updater v2.1.0",
         "configVersion": "1.0"
     }
 }

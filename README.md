@@ -1,6 +1,6 @@
-# Windows Update Automation Script
+# Windows Comprehensive Updater
 
-A fully automated Windows update solution that handles system updates, application updates via Winget, and scheduled maintenance with zero user interaction required.
+A fully automated Windows system maintenance solution that handles system updates, application updates via Winget, scheduled maintenance, and comprehensive system automation with zero user interaction required.
 
 ## 🌟 Features
 
@@ -27,13 +27,13 @@ A fully automated Windows update solution that handles system updates, applicati
 
 ```powershell
 # Run with default settings (requires admin rights)
-.\windows-update-script.ps1
+.\windows-comprehensive-updater.ps1
 
 # Show the monitoring dashboard
-.\windows-update-script.ps1 -ShowDashboard
+.\windows-comprehensive-updater.ps1 -ShowDashboard
 
 # Deploy script to C:\Scripts and create scheduled tasks
-.\windows-update-script.ps1 -Deploy -CreateSchedule
+.\windows-comprehensive-updater.ps1 -Deploy -CreateSchedule
 ```
 
 ## ⚙️ Command Line Parameters
@@ -76,7 +76,7 @@ A fully automated Windows update solution that handles system updates, applicati
 To monitor the update process in real-time:
 
 ```powershell
-.\windows-update-script.ps1 -ShowDashboard
+.\windows-comprehensive-updater.ps1 -ShowDashboard
 ```
 
 This will start a local web server and open the dashboard in your default browser.
@@ -86,7 +86,7 @@ This will start a local web server and open the dashboard in your default browse
 To create scheduled tasks for automatic updates:
 
 ```powershell
-.\windows-update-script.ps1 -CreateSchedule
+.\windows-comprehensive-updater.ps1 -CreateSchedule
 ```
 
 This will create two scheduled tasks:
@@ -117,13 +117,13 @@ The script includes a comprehensive test suite to validate functionality:
 
 ```powershell
 # Run all tests
-.\test-windows-update-script.ps1 -RunAll
+.\test-windows-comprehensive-updater.ps1 -RunAll
 
 # Run basic validation tests
-.\test-windows-update-script.ps1 -RunBasicTests -ShowDetails
+.\test-windows-comprehensive-updater.ps1 -RunBasicTests -ShowDetails
 
 # Run function and syntax tests
-.\test-windows-update-script.ps1 -RunFunctionTests
+.\test-windows-comprehensive-updater.ps1 -RunFunctionTests
 ```
 
 The test suite validates:
@@ -148,12 +148,12 @@ The script supports an optional configuration file (`windows-update-config.json`
 ## 📁 Project Structure
 
 ```text
-Windows-Update-Script/
-├── windows-update-script.ps1          # Main update script
-├── windows-update-dashboard.html      # Real-time monitoring dashboard
-├── windows-update-config.json         # Optional configuration file
+Windows-Comprehensive-Updater/
+├── windows-comprehensive-updater.ps1          # Main update script
+├── windows-comprehensive-updater-dashboard.html      # Real-time monitoring dashboard
+├── windows-comprehensive-updater-config.json         # Optional configuration file
 ├── win11allow.ps1                     # Windows 11 upgrade bypass helper
-├── test-windows-update-script.ps1     # Test suite for validation
+├── test-windows-comprehensive-updater.ps1     # Test suite for validation
 └── README.md                          # This documentation
 ```
 
@@ -195,6 +195,6 @@ For issues and feature requests, please open an issue on the GitHub repository.
 ## 🤝 Contributing
 
 1. Run the test suite before submitting changes
-2. Ensure all tests pass with `./test-windows-update-script.ps1 -RunAll`
+2. Ensure all tests pass with `./test-windows-comprehensive-updater.ps1 -RunAll`
 3. Follow PowerShell best practices and maintain existing code style
 4. Update documentation for any new features

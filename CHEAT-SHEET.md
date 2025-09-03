@@ -1,29 +1,29 @@
-# Windows Update Script - Quick Reference
+# Windows Comprehensive Updater - Quick Reference
 
 ## 🚀 Basic Commands
 
 ### Run Updates Now
 
 ```powershell
-.\windows-update-script.ps1
+.\windows-comprehensive-updater.ps1
 ```
 
 ### Run with Dashboard
 
 ```powershell
-.\windows-update-script.ps1 -ShowDashboard
+.\windows-comprehensive-updater.ps1 -ShowDashboard
 ```
 
 ### Set Up Automatic Updates
 
 ```powershell
-.\windows-update-script.ps1 -CreateSchedule
+.\windows-comprehensive-updater.ps1 -CreateSchedule
 ```
 
 ### Just Check for Updates
 
 ```powershell
-.\windows-update-script.ps1 -CheckCumulative
+.\windows-comprehensive-updater.ps1 -CheckCumulative
 ```
 
 ## 📋 What It Does
@@ -90,4 +90,4 @@ Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ---
 
-**Remember**: Most users just need `.\windows-update-script.ps1`
+**Remember**: Most users just need `.\windows-comprehensive-updater.ps1`

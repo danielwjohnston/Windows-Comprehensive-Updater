@@ -1,10 +1,10 @@
 # ============================================================================
-# FULLY AUTOMATED WINDOWS UPDATE SCRIPT WITH SELF-DEPLOYMENT
+# FULLY AUTOMATED WINDOWS COMPREHENSIVE UPDATER WITH SELF-DEPLOYMENT
 # Script Version: 2.1.0 - Enhanced Bulletproof Edition
 # ============================================================================
 
 # 
-# PURPOSE: This script provides a completely hands-off Windows update experience
+# PURPOSE: This script provides a completely hands-off Windows system maintenance experience
 # that automatically handles privilege escalation, downloads required tools,
 # installs all available updates, performs silent reboots, and deploys itself
 # locally for scheduled execution.
@@ -252,7 +252,7 @@ function Test-ScriptNeedsUpdate {
         $currentVersion = if ($currentVersionMatch) { $currentVersionMatch.Matches[0].Groups[1].Value } else { "1.0" }
         
         # DEPLOYED VERSION CHECK: Check version of deployed script if it exists
-        $deployedScriptPath = "C:\Scripts\windows-update-script.ps1"
+        $deployedScriptPath = "C:\Scripts\windows-comprehensive-updater.ps1"
         if (Test-Path $deployedScriptPath) {
             $deployedContent = Get-Content -Path $deployedScriptPath -Raw -ErrorAction SilentlyContinue
             $deployedVersionMatch = $deployedContent | Select-String 'Script Version: ([\d\.]+)'
@@ -452,8 +452,8 @@ function Invoke-SelfDeployment {
     
     # DEPLOYMENT TARGET: Standard location for system scripts
     $targetDir = "C:\Scripts"
-    $targetScript = Join-Path $targetDir "windows-update-script.ps1"
-    $targetDashboard = Join-Path $targetDir "windows-update-dashboard.html"
+    $targetScript = Join-Path $targetDir "windows-comprehensive-updater.ps1"
+    $targetDashboard = Join-Path $targetDir "windows-comprehensive-updater-dashboard.html"
     
     # LOCAL EXECUTION CHECK: Determine if we're already running from target location
     $currentPath = $MyInvocation.MyCommand.Path
@@ -481,14 +481,14 @@ function Invoke-SelfDeployment {
             # DASHBOARD DEPLOYMENT: Look for dashboard file and deploy it
             $dashboardSources = @(
                 # Same directory as current script
-                (Join-Path (Split-Path $currentPath -Parent) "windows-update-dashboard.html"),
+                (Join-Path (Split-Path $currentPath -Parent) "windows-comprehensive-updater-dashboard.html"),
                 # Custom dashboard path if specified
                 $DashboardPath,
                 # Current directory
-                ".\windows-update-dashboard.html",
+                ".\windows-comprehensive-updater-dashboard.html",
                 # Look in common locations
-                "C:\Temp\windows-update-dashboard.html",
-                "$env:USERPROFILE\Downloads\windows-update-dashboard.html"
+                "C:\Temp\windows-comprehensive-updater-dashboard.html",
+                "$env:USERPROFILE\Downloads\windows-comprehensive-updater-dashboard.html"
             ) | Where-Object { $_ -and (Test-Path $_) }
             
             if ($dashboardSources.Count -gt 0) {
@@ -551,7 +551,7 @@ function New-PatchTuesdaySchedule {
     )
     Write-Host "Creating Patch Tuesday automated schedule (precise date logic)..." -ForegroundColor Cyan
     try {
-        $scriptPath = Join-Path "C:\Scripts" "windows-update-script.ps1"
+        $scriptPath = Join-Path "C:\Scripts" "windows-comprehensive-updater.ps1"
         $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 30)
         $actionMain = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -ShowDashboard"
@@ -690,14 +690,14 @@ function New-EmbeddedDashboard {
     # MINIMAL DASHBOARD: Basic monitoring interface when full dashboard unavailable
     $dashboardContent = @"
 <!DOCTYPE html>
-<html><head><title>Windows Update Monitor</title><style>
+<html><head><title>Windows Comprehensive Updater Monitor</title><style>
 body{background:#0b0b0b;color:#e6e6e6;font-family:system-ui;padding:20px;}
 .card{background:#171717;border:1px solid #262626;border-radius:16px;padding:20px;margin:10px 0;}
 .status{display:inline-block;padding:8px 16px;border-radius:20px;font-weight:bold;}
 .running{background:#00ff0040;color:#00ff00;border:1px solid #00ff00;}
 .log{background:#1e1e1e;border-radius:8px;padding:15px;height:300px;overflow-y:auto;font-family:monospace;}
 </style></head><body>
-<div class="card"><h1>Windows Update Monitor</h1>
+<div class="card"><h1>Windows Comprehensive Updater Monitor</h1>
 <div id="status" class="status running">Monitoring Active</div></div>
 <div class="card"><h2>System Status</h2>
 <div>Computer: <span id="computer">Loading...</span></div>
@@ -928,7 +928,7 @@ function Start-UpdateDashboard {
             if (-not (Test-Path $scriptDir)) {
                 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
             }
-            $HtmlPath = Join-Path $scriptDir "windows-update-dashboard.html"
+            $HtmlPath = Join-Path $scriptDir "windows-comprehensive-updater-dashboard.html"
         }
         
         if (-not (Test-Path $HtmlPath)) {
@@ -936,7 +936,7 @@ function Start-UpdateDashboard {
             return $false
         }
         
-        Write-LogMessage "Launching Windows Update Dashboard..."
+        Write-LogMessage "Launching Windows Comprehensive Updater Dashboard..."
         Start-Process $HtmlPath
         return $true
     } catch {
@@ -1023,7 +1023,7 @@ function Confirm-WizmoAvailability {
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         $webClient = New-Object System.Net.WebClient
-        $webClient.Headers.Add("User-Agent", "PowerShell Windows Update Script")
+        $webClient.Headers.Add("User-Agent", "PowerShell Windows Comprehensive Updater")
         $webClient.DownloadFile($wizmoUrl, $wizmoPath)
         
         Write-LogMessage "Wizmo downloaded successfully to $wizmoPath"

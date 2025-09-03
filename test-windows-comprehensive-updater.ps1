@@ -1,5 +1,5 @@
 # ============================================================================
-# WINDOWS UPDATE SCRIPT TEST SUITE
+# WINDOWS COMPREHENSIVE UPDATER TEST SUITE
 # Script Version: 2.1.0 - Testing Framework
 # ============================================================================
 
@@ -102,9 +102,9 @@ function Test-FileDependencies {
     $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
     
     # Test main script file
-    $mainScript = Join-Path $scriptDir "windows-update-script.ps1"
+    $mainScript = Join-Path $scriptDir "windows-comprehensive-updater.ps1"
     if (Test-Path $mainScript) {
-        Write-TestResult "Main Script File" "PASS" "windows-update-script.ps1 exists"
+        Write-TestResult "Main Script File" "PASS" "windows-comprehensive-updater.ps1 exists"
         
         # Test script size (should be substantial)
         $scriptSize = (Get-Item $mainScript).Length
@@ -114,17 +114,17 @@ function Test-FileDependencies {
             Write-TestResult "Script Content Size" "FAIL" "Script appears incomplete ($([math]::Round($scriptSize/1KB,2)) KB)"
         }
     } else {
-        Write-TestResult "Main Script File" "FAIL" "windows-update-script.ps1 not found"
+        Write-TestResult "Main Script File" "FAIL" "windows-comprehensive-updater.ps1 not found"
     }
     
     # Test dashboard file
-    $dashboardFile = Join-Path $scriptDir "windows-update-dashboard.html"
+    $dashboardFile = Join-Path $scriptDir "windows-comprehensive-updater-dashboard.html"
     if (Test-Path $dashboardFile) {
         Write-TestResult "Dashboard HTML File" "PASS" "Dashboard file exists"
         
         # Test for essential HTML elements
         $htmlContent = Get-Content $dashboardFile -Raw
-        if ($htmlContent -match "Windows Update Monitor" -and $htmlContent -match "javascript") {
+        if ($htmlContent -match "Windows Comprehensive Updater Monitor" -and $htmlContent -match "javascript") {
             Write-TestResult "Dashboard Content" "PASS" "Dashboard contains required elements"
         } else {
             Write-TestResult "Dashboard Content" "FAIL" "Dashboard missing essential content"
@@ -166,7 +166,7 @@ function Test-ParameterValidation {
     Write-Host "`n=== PARAMETER VALIDATION TESTS ===" -ForegroundColor Cyan
     
     $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-    $mainScript = Join-Path $scriptDir "windows-update-script.ps1"
+    $mainScript = Join-Path $scriptDir "windows-comprehensive-updater.ps1"
     
     if (-not (Test-Path $mainScript)) {
         Write-TestResult "Parameter Validation" "SKIP" "Main script not found for testing"
@@ -493,7 +493,7 @@ function Test-ScriptFunctionDependencies {
     Write-Host "`n=== SCRIPT FUNCTION DEPENDENCY TESTS ===" -ForegroundColor Cyan
     
     $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-    $mainScript = Join-Path $scriptDir "windows-update-script.ps1"
+    $mainScript = Join-Path $scriptDir "windows-comprehensive-updater.ps1"
     
     if (-not (Test-Path $mainScript)) {
         Write-TestResult "Main Script" "SKIP" "Main script not found for dependency testing"
@@ -620,12 +620,12 @@ function Test-PerformanceMetrics {
 
 # FUNCTION: Main Test Execution
 function Start-TestSuite {
-    Write-Host "Windows Update Script Test Suite v2.1.0" -ForegroundColor Cyan
+    Write-Host "Windows Comprehensive Updater Test Suite v2.1.0" -ForegroundColor Cyan
     Write-Host "=========================================" -ForegroundColor Cyan
     Write-Host "Started: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Gray
     
     $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-    $mainScript = Join-Path $scriptDir "windows-update-script.ps1"
+    $mainScript = Join-Path $scriptDir "windows-comprehensive-updater.ps1"
     
     # Run selected test categories
     if ($RunAll -or $RunBasicTests) {
@@ -698,7 +698,7 @@ function Start-TestSuite {
 
 # Script execution
 if (-not ($RunBasicTests -or $RunFunctionTests -or $RunIntegrationTests -or $RunAll)) {
-    Write-Host "Windows Update Script Test Suite" -ForegroundColor Cyan
+    Write-Host "Windows Comprehensive Updater Test Suite" -ForegroundColor Cyan
     Write-Host "Usage:" -ForegroundColor White
     Write-Host "  -RunBasicTests      Run basic validation tests" -ForegroundColor Gray
     Write-Host "  -RunFunctionTests   Run function and syntax tests" -ForegroundColor Gray
@@ -707,8 +707,8 @@ if (-not ($RunBasicTests -or $RunFunctionTests -or $RunIntegrationTests -or $Run
     Write-Host "  -ShowDetails        Show detailed test results" -ForegroundColor Gray
     Write-Host ""
     Write-Host "Examples:" -ForegroundColor White
-    Write-Host "  .\test-windows-update-script.ps1 -RunAll" -ForegroundColor Gray
-    Write-Host "  .\test-windows-update-script.ps1 -RunBasicTests -ShowDetails" -ForegroundColor Gray
+    Write-Host "  .\test-windows-comprehensive-updater.ps1 -RunAll" -ForegroundColor Gray
+    Write-Host "  .\test-windows-comprehensive-updater.ps1 -RunBasicTests -ShowDetails" -ForegroundColor Gray
 } else {
     $exitCode = Start-TestSuite
     Exit $exitCode
