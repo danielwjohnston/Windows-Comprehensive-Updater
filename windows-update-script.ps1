@@ -1,8 +1,12 @@
 # ============================================================================
 # FULLY AUTOMATED WINDOWS UPDATE SCRIPT WITH SELF-DEPLOYMENT
+<<<<<<< HEAD
 # Script Version: 2.1.0 - Enhanced Bulletproof Edition
 # ============================================================================
 
+=======
+# ============================================================================
+>>>>>>> 812fb49 (Implement code changes to enhance functionality and improve performance)
 # 
 # PURPOSE: This script provides a completely hands-off Windows update experience
 # that automatically handles privilege escalation, downloads required tools,
@@ -765,6 +769,7 @@ function Confirm-WizmoAvailability {
             # SIZE REPORTING: Convert bytes to KB for human-readable feedback
             $sizeKB = [math]::Round((Get-Item $wizmoPath).Length / 1KB, 2)
             Write-LogMessage "Wizmo download verified (Size: $sizeKB KB)"
+<<<<<<< HEAD
             
             # UNBLOCK FILE: Remove "downloaded from internet" restrictions
             # WHY NEEDED: Downloaded files are marked with Zone.Identifier and require "Unblock"
@@ -789,6 +794,8 @@ function Confirm-WizmoAvailability {
                 }
             }
             
+=======
+>>>>>>> 812fb49 (Implement code changes to enhance functionality and improve performance)
             return $wizmoPath
         } else {
             # FAILURE DETECTION: File exists but is suspiciously small
@@ -815,9 +822,15 @@ function Invoke-SilentReboot {
     if ($wizmoPath -and (Test-Path $wizmoPath)) {
         try {
             Write-LogMessage "Using Wizmo for silent reboot"
+<<<<<<< HEAD
             # WIZMO EXECUTION: Use correct syntax for truly silent reboot
             # WHY "quiet reboot!": The "quiet" parameter suppresses all notifications and dialogs
             & $wizmoPath quiet reboot!
+=======
+            # WIZMO EXECUTION: Simple command execution - no parameters needed
+            # WHY & OPERATOR: Proper way to execute external programs in PowerShell
+            & $wizmoPath reboot
+>>>>>>> 812fb49 (Implement code changes to enhance functionality and improve performance)
             # BRIEF PAUSE: Allow the reboot command to initiate before script continues
             Start-Sleep -Seconds 5
         } catch {
@@ -834,6 +847,7 @@ function Invoke-SilentReboot {
     }
 }
 
+<<<<<<< HEAD
 # =========================================================================# ============================================================================
 # FULLY AUTOMATED WINDOWS UPDATE SCRIPT WITH SELF-DEPLOYMENT
 # Script Version: 2.1.0 - Enhanced Edition
@@ -1667,3 +1681,858 @@ function Invoke-SilentReboot {
         shutdown.exe /r /t 0 /f
     }
 }
+=======
+# ============================================================================
+# MAIN SCRIPT EXECUTION BEGINS HERE
+# ============================================================================
+
+# PRIVILEGE CHECK: Ensure script runs with necessary permissions
+# WHY FIRST: No point in continuing without proper privileges
+Confirm-RunAsAdmin
+
+# GLOBAL VARIABLE: Centralized log file location
+# WHY GLOBAL: Multiple functions need access, and it ensures consistency
+# WHY C:\ ROOT: Accessible regardless of user profile, survives user switches
+$global:logFile = "C:\WindowsUpdateLog.txt"
+
+# EVENT VIEWER INTEGRATION: Register custom event source for enterprise logging
+# WHY EVENT SOURCE: Allows filtering and monitoring in Event Viewer
+# REGISTRATION: Must be done early before any event logging attempts
+try {
+    # CHECK EXISTING: See if our event source is already registered
+    if (-not [System.Diagnostics.EventLog]::SourceExists("WindowsUpdateScript")) {
+        Write-Host "Registering Windows Event Log source for enterprise monitoring..." -ForegroundColor Cyan
+        # NEW-EVENTLOG: Register our custom event source
+        # -LogName Application: Use standard Windows Application log
+        # -Source: Our unique identifier for filtering events
+        New-EventLog -LogName Application -Source "WindowsUpdateScript"
+        Write-Host "Event log source registered successfully" -ForegroundColor Green
+    }
+} catch {
+    # REGISTRATION FAILURE: Non-critical, script can continue without Event Viewer integration
+    Write-Host "Event log source registration failed (script will continue): $_" -ForegroundColor Yellow
+}
+
+# DASHBOARD LAUNCH: Start monitoring dashboard if requested
+if ($ShowDashboard -or $DashboardPath) {
+    Write-LogMessage "Dashboard requested - attempting to launch..."
+    $dashboardLaunched = Start-UpdateDashboard -HtmlPath $DashboardPath
+    if ($dashboardLaunched) {
+        Write-LogMessage "Dashboard launched successfully - real-time monitoring available"
+        # INITIAL STATUS UPDATE: Set dashboard to initialization phase
+        Update-DashboardStatus -Phase "initialization" -Progress 5 -CurrentOperation "Script starting..."
+    }
+} else {
+    Write-LogMessage "Running without dashboard - use -ShowDashboard parameter for visual monitoring"
+}
+
+# EXECUTION POLICY: Temporarily bypass script execution restrictions
+# WHY NECESSARY: Many systems have restrictive policies that prevent script execution
+# SCOPE PROCESS: Only affects this PowerShell session, doesn't change system settings
+try {
+    Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+    Write-LogMessage "Execution policy set to Bypass for this session"
+} catch {
+    # NON-FATAL ERROR: Script might still work even if this fails
+    Write-LogMessage "Could not set execution policy: $_" "WARNING"
+}
+
+# ============================================================================
+# WINGET UPDATES: Update core Windows applications before Windows Updates
+# ============================================================================
+# WHY FIRST: Updating PowerShell, Terminal, and App Installer ensures we have
+# the latest tools available for the Windows Update process
+# STRATEGY: Use Winget to update Microsoft's core applications silently
+# ERROR HANDLING: Multi-pass approach with escalating remediation strategies
+
+# WINGET AVAILABILITY CHECK: Ensure Winget (App Installer) is available
+# WINGET: Microsoft's official package manager for Windows
+function Update-CoreAppsWithWinget {
+    Write-LogMessage "=========================================="
+    Write-LogMessage "PHASE 1: Updating Core Windows Applications with Winget"
+    Write-LogMessage "=========================================="
+    
+    try {
+        # WINGET DETECTION: Check if winget command is available
+        $wingetPath = Get-Command winget -ErrorAction SilentlyContinue
+        
+        if (-not $wingetPath) {
+            Write-LogMessage "Winget not found - attempting to install App Installer..." "WARNING"
+            
+            # APP INSTALLER INSTALLATION: Download and install latest App Installer
+            # WHY NEEDED: Winget comes with App Installer package
+            try {
+                # DOWNLOAD URL: Official Microsoft Store link for App Installer
+                $appInstallerUrl = "https://aka.ms/getwinget"
+                # TEMP PATH: Use proper path construction to avoid colon parsing issues
+                $tempPath = Join-Path $env:TEMP "Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
+                
+                Write-LogMessage "Downloading App Installer from Microsoft..."
+                # WEBCLIENT DOWNLOAD: Reliable download method
+                $webClient = New-Object System.Net.WebClient
+                $webClient.Headers.Add("User-Agent", "PowerShell Windows Update Script")
+                $webClient.DownloadFile($appInstallerUrl, $tempPath)
+                
+                Write-LogMessage "Installing App Installer..."
+                # ADD-APPXPACKAGE: Install MSIX package
+                Add-AppxPackage -Path $tempPath -ForceApplicationShutdown
+                
+                # CLEANUP: Remove temporary download
+                Remove-Item $tempPath -Force -ErrorAction SilentlyContinue
+                
+                Write-LogMessage "App Installer installation completed"
+                Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1010 -EntryType Information -Message "App Installer installed successfully"
+                
+                # PATH REFRESH: Update PATH environment variable
+                $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
+                
+            } catch {
+                Write-LogMessage "Failed to install App Installer: $_" "WARNING"
+                Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 3010 -EntryType Warning -Message "Failed to install App Installer: $_"
+                return $false
+            }
+        
+        # VERIFY WINGET: Final check that winget is now available
+        $wingetPath = Get-Command winget -ErrorAction SilentlyContinue
+        if (-not $wingetPath) {
+            Write-LogMessage "Winget still not available after installation attempt" "WARNING"
+            return $false
+        }
+        
+        Write-LogMessage "Winget detected at: $($wingetPath.Source)"
+        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1011 -EntryType Information -Message "Winget available at: $($wingetPath.Source)"
+        
+        # CORE APPLICATIONS TO UPDATE: Essential Microsoft applications with conflict handling
+        # WHY THESE: PowerShell for scripting, Terminal for interface, App Installer for package management
+        # CONFLICT AWARENESS: Some apps can't be updated while running (PowerShell, active Terminal)
+        $coreApps = @(
+            @{ 
+                Name = "Microsoft.PowerShell"
+                DisplayName = "PowerShell 7+"
+                ConflictRisk = $true  # Can't update PowerShell while PowerShell script is running
+                RemediationStrategies = @("external-process", "repair", "uninstall-reinstall")
+            },
+            @{ 
+                Name = "Microsoft.WindowsTerminal"
+                DisplayName = "Windows Terminal"
+                ConflictRisk = $true  # Can't update if Terminal is currently running
+                RemediationStrategies = @("external-process", "reset-app", "uninstall-reinstall")
+            },
+            @{ 
+                Name = "Microsoft.DesktopAppInstaller"
+                DisplayName = "App Installer (Winget)"
+                ConflictRisk = $false  # Usually safe to update
+                RemediationStrategies = @("repair", "reset-winget", "reinstall-appinstaller")
+            }
+        )
+        
+        Write-LogMessage "Starting intelligent update process with conflict resolution..."
+        Update-DashboardStatus -Phase "winget" -Progress 20 -CurrentOperation "Analyzing application conflicts..." -AdditionalData @{wingetApps = 0}
+        
+        # CONFLICT DETECTION: Identify apps that need special handling
+        $conflictingApps = $coreApps | Where-Object { $_.ConflictRisk -eq $true }
+        $nonConflictingApps = $coreApps | Where-Object { $_.ConflictRisk -eq $false }
+        
+        if ($conflictingApps.Count -gt 0) {
+            Write-LogMessage "Found $($conflictingApps.Count) applications requiring conflict resolution"
+            Write-LogMessage "Conflicting apps: $($conflictingApps.DisplayName -join ', ')"
+            
+            # HANDLE CONFLICTING APPS FIRST: Use external processes for PowerShell/Terminal
+            Update-DashboardStatus -Phase "winget" -Progress 25 -CurrentOperation "Resolving application conflicts..."
+            Update-ConflictingApplications -ConflictingApps $conflictingApps
+        }
+        
+        # HANDLE NON-CONFLICTING APPS: Standard PowerShell winget execution
+        if ($nonConflictingApps.Count -gt 0) {
+            Write-LogMessage "Processing $($nonConflictingApps.Count) non-conflicting applications..."
+            Update-DashboardStatus -Phase "winget" -Progress 35 -CurrentOperation "Updating non-conflicting applications..."
+            
+            foreach ($app in $nonConflictingApps) {
+                Write-LogMessage "Updating $($app.DisplayName)..."
+                try {
+                    $null = & winget upgrade $app.Name --silent --accept-package-agreements --accept-source-agreements 2>&1
+                    
+                    if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq -1978335212) {
+                        Write-LogMessage "$($app.DisplayName) updated successfully"
+                        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1012 -EntryType Information -Message "$($app.DisplayName) updated successfully"
+                    } else {
+                        Write-LogMessage "$($app.DisplayName) update completed with exit code: $LASTEXITCODE" "WARNING"
+                    }
+                } catch {
+                    Write-LogMessage "Failed to update $($app.DisplayName): $_" "WARNING"
+                }
+            }
+        }
+        
+        # SKIP MULTI-PASS LOGIC: Since we handled conflicts already, simplified approach
+        Write-LogMessage "Core applications update phase completed with conflict resolution"
+        
+        # MULTI-PASS UPDATE STRATEGY: Up to 3 passes with escalating remediation
+        # PASS 1: Normal update attempts
+        # PASS 2: Repair and retry failed applications
+        # PASS 3: Uninstall/reinstall for stubborn failures
+        $maxPasses = 3
+        $failedApps = @()
+        
+        for ($pass = 1; $pass -le $maxPasses; $pass++) {
+            Write-LogMessage "--- Winget Update Pass $pass of $maxPasses ---"
+            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1015 -EntryType Information -Message "Starting Winget update pass $pass of $maxPasses"
+            Update-DashboardStatus -Phase "winget" -Progress (15 + ($pass * 10)) -CurrentOperation "Winget Pass $pass of $maxPasses"
+            
+            # DETERMINE APPS TO PROCESS: All apps on first pass, only failed apps on subsequent passes
+            $appsToProcess = if ($pass -eq 1) { $coreApps } else { $failedApps }
+            $currentPassFailed = @()
+            
+            if ($appsToProcess.Count -eq 0) {
+                Write-LogMessage "No applications require processing in pass $pass"
+                break
+            }
+            
+            foreach ($app in $appsToProcess) {
+                Write-LogMessage "Processing $($app.DisplayName) in pass $pass..."
+                $updateSuccessful = $false
+                
+                try {
+                    # PASS-SPECIFIC STRATEGY: Different approaches based on pass number
+                    switch ($pass) {
+                        1 {
+                            # PASS 1: Standard update attempt
+                            Write-LogMessage "Attempting standard update for $($app.DisplayName)..."
+                            # Execute winget upgrade and log the output
+                            $wingetOutput = & winget upgrade $app.Name --silent --accept-package-agreements --accept-source-agreements 2>&1
+                            # Log the output for troubleshooting
+                            if ($wingetOutput) {
+                                Write-LogMessage "Winget output: $($wingetOutput -join '; ')" "INFO"
+                            }
+                        }
+                        
+                        2 {
+                            # PASS 2: Repair-based remediation
+                            Write-LogMessage "Attempting repair-based remediation for $($app.DisplayName)..."
+                            
+                            # REMEDIATION STRATEGY: Try repair first, then update
+                            switch ($app.Name) {
+                                "Microsoft.PowerShell" {
+                                    Write-LogMessage "Attempting PowerShell repair via winget..."
+                                    & winget install $app.Name --force --silent --accept-package-agreements --accept-source-agreements 2>&1 | Out-Null
+                                }
+                                
+                                "Microsoft.WindowsTerminal" {
+                                    Write-LogMessage "Resetting Windows Terminal app data..."
+                                    # RESET TERMINAL: Clear app data to resolve configuration conflicts
+                                    try {
+                                        Get-AppxPackage Microsoft.WindowsTerminal | Reset-AppxPackage
+                                        Start-Sleep -Seconds 5
+                                    } catch {
+                                        Write-LogMessage "Terminal reset failed: $_" "WARNING"
+                                    }
+                                }
+                                
+                                "Microsoft.DesktopAppInstaller" {
+                                    Write-LogMessage "Resetting Winget configuration..."
+                                    # WINGET RESET: Clear winget settings and cache
+                                    try {
+                                        & winget settings --enable LocalManifestFiles 2>&1 | Out-Null
+                                        # SAFE PATH CONSTRUCTION: Avoid colon parsing issues with wildcard paths
+                                        $appInstallerPath = Join-Path $env:LOCALAPPDATA "Packages"
+                                        $appInstallerPath = Join-Path $appInstallerPath "Microsoft.DesktopAppInstaller*"
+                                        $localStatePath = Join-Path $appInstallerPath "LocalState"
+                                        Remove-Item "$localStatePath\*" -Recurse -Force -ErrorAction SilentlyContinue
+                                        Start-Sleep -Seconds 3
+                                    } catch {
+                                        Write-LogMessage "Winget reset failed: $_" "WARNING"
+                                    }
+                                }
+                            }
+                            
+                            # RETRY UPDATE: After remediation attempt
+                            Start-Sleep -Seconds 5
+                            $null = & winget upgrade $app.Name --silent --accept-package-agreements --accept-source-agreements 2>&1
+                        }
+                        
+                        3 {
+                            # PASS 3: Nuclear option - uninstall and reinstall
+                            Write-LogMessage "Attempting uninstall/reinstall for $($app.DisplayName)..."
+                            
+                            try {
+                                # UNINSTALL FIRST: Remove existing problematic installation
+                                Write-LogMessage "Uninstalling $($app.DisplayName)..."
+                                & winget uninstall $app.Name --silent --accept-source-agreements 2>&1 | Out-Null
+                                Start-Sleep -Seconds 10
+                                
+                                # CLEAN REINSTALL: Fresh installation
+                                Write-LogMessage "Reinstalling $($app.DisplayName)..."
+                                $null = & winget install $app.Name --silent --accept-package-agreements --accept-source-agreements 2>&1
+                                
+                            } catch {
+                                Write-LogMessage "Uninstall/reinstall failed for $($app.DisplayName): $_" "ERROR"
+                            }
+                        }
+                    }
+                    
+                    # RESULT ANALYSIS: Comprehensive exit code interpretation
+                    # WINGET EXIT CODES: Microsoft's documented return codes
+                    switch ($LASTEXITCODE) {
+                        0 {
+                            # SUCCESS: Update completed successfully
+                            Write-LogMessage "$($app.DisplayName) updated successfully in pass $pass"
+                            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1012 -EntryType Information -Message "$($app.DisplayName) updated successfully in pass $pass"
+                            $updateSuccessful = $true
+                        }
+                        
+                        -1978335212 {
+                            # NO UPDATE AVAILABLE: Already up to date
+                            Write-LogMessage "$($app.DisplayName) is already up to date"
+                            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1013 -EntryType Information -Message "$($app.DisplayName) is already up to date"
+                            $updateSuccessful = $true
+                        }
+                        
+                        -1978335215 {
+                            # PACKAGE NOT FOUND: Application not found in repository
+                            Write-LogMessage "$($app.DisplayName) not found in winget repository" "WARNING"
+                            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 3014 -EntryType Warning -Message "$($app.DisplayName) not found in winget repository"
+                            # DON'T RETRY: If package doesn't exist, retrying won't help
+                            $updateSuccessful = $true  # Mark as "successful" to prevent retries
+                        }
+                        
+                        -1978335216 {
+                            # MULTIPLE PACKAGES FOUND: Ambiguous package name
+                            Write-LogMessage "$($app.DisplayName) package name is ambiguous, trying with source specification..." "WARNING"
+                            try {
+                                # RETRY WITH SOURCE: Specify Microsoft Store as source
+                                $retryOutput = & winget upgrade $app.Name --source msstore --silent --accept-package-agreements --accept-source-agreements 2>&1
+                                if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq -1978335212) {
+                                    $updateSuccessful = $true
+                                    Write-LogMessage "$($app.DisplayName) updated successfully with source specification"
+                                    # LOG OUTPUT: Capture successful retry output
+                                    if ($retryOutput) {
+                                        Write-LogMessage "Source retry output: $($retryOutput -join '; ')" "INFO"
+                                    }
+                                }
+                            } catch {
+                                Write-LogMessage "Source specification retry failed: $_" "WARNING"
+                            }
+                        }
+                        
+                        -1978335222 {
+                            # INSTALLER FAILED: The installer itself failed
+                            Write-LogMessage "$($app.DisplayName) installer failed (will retry in next pass if available)" "WARNING"
+                            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 3015 -EntryType Warning -Message "$($app.DisplayName) installer failed in pass $pass, exit code: $LASTEXITCODE"
+                        }
+                        
+                        -1978335213 {
+                            # PACKAGE IN USE: Application currently running
+                            Write-LogMessage "$($app.DisplayName) is currently in use, attempting to close and retry..." "WARNING"
+                            
+                                    # PROCESS TERMINATION: Try to close the application gracefully
+                                    try {
+                                        switch ($app.Name) {
+                                            "Microsoft.PowerShell" {
+                                                Get-Process pwsh -ErrorAction SilentlyContinue | Stop-Process -Force
+                                            }
+                                            "Microsoft.WindowsTerminal" {
+                                                Get-Process WindowsTerminal -ErrorAction SilentlyContinue | Stop-Process -Force
+                                            }
+                                        }
+                                        Start-Sleep -Seconds 5
+                                
+                                        # RETRY AFTER CLOSING: Attempt update again
+                                        $retryAfterCloseOutput = & winget upgrade $app.Name --silent --accept-package-agreements --accept-source-agreements 2>&1
+                                        if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq -1978335212) {
+                                            $updateSuccessful = $true
+                                            Write-LogMessage "$($app.DisplayName) updated successfully after closing processes"
+                                            # LOG OUTPUT: Capture retry output
+                                            if ($retryAfterCloseOutput) {
+                                                Write-LogMessage "Process close retry output: $($retryAfterCloseOutput -join '; ')" "INFO"
+                                            }
+                                        }
+                                    } catch {
+                                        Write-LogMessage "Process termination and retry failed: $_" "WARNING"
+                                    }
+                        }
+                        
+                        default {
+                            # UNKNOWN ERROR: Log the exit code for troubleshooting
+                            Write-LogMessage "$($app.DisplayName) update failed with exit code: $LASTEXITCODE (pass $pass)" "WARNING"
+                            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 3016 -EntryType Warning -Message "$($app.DisplayName) update failed in pass $pass with exit code: $LASTEXITCODE"
+                        }
+                    }
+                    
+                } catch {
+                    # EXCEPTION HANDLING: PowerShell execution errors
+                    # VARIABLE SAFETY: Proper string interpolation to avoid colon parsing issues
+                    Write-LogMessage "Exception during $($app.DisplayName) update in pass $($pass): $($_)" "ERROR"
+                    Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 5015 -EntryType Error -Message ("Exception during {0} update in pass {1}: {2}" -f $app.DisplayName, $pass, $_)
+                }
+                
+                # FAILURE TRACKING: Add to failed list if update unsuccessful and more passes available
+                if (-not $updateSuccessful -and $pass -lt $maxPasses) {
+                    $currentPassFailed += $app
+                    Write-LogMessage "$($app.DisplayName) will be retried in pass $($pass + 1)"
+                } elseif (-not $updateSuccessful) {
+                    Write-LogMessage "$($app.DisplayName) failed all remediation attempts" "ERROR"
+                    Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 5016 -EntryType Error -Message "$($app.DisplayName) failed all $maxPasses remediation attempts"
+                }
+            }
+            
+            # UPDATE FAILED LIST: Prepare for next pass
+            $failedApps = $currentPassFailed
+            
+            # PASS COMPLETION: Log pass results
+            if ($failedApps.Count -eq 0) {
+                Write-LogMessage "All applications updated successfully in pass $pass"
+                Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1016 -EntryType Information -Message "All applications updated successfully in pass $pass"
+                break
+            } else {
+                Write-LogMessage "Pass $pass completed with $($failedApps.Count) applications requiring retry"
+                Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 3017 -EntryType Warning -Message "Pass $pass completed with $($failedApps.Count) applications requiring retry"
+            }
+            
+            # INTER-PASS DELAY: Allow system to stabilize between passes
+            if ($pass -lt $maxPasses -and $failedApps.Count -gt 0) {
+                Write-LogMessage "Waiting 30 seconds before next remediation pass..."
+                Start-Sleep -Seconds 30
+            }
+        }
+        
+        # WINGET SOURCE UPDATE: Refresh package source information
+        # WHY NEEDED: Ensures we have the latest package information
+        try {
+            Write-LogMessage "Updating Winget source information..."
+            & winget source update --silent 2>&1 | Out-Null
+            Write-LogMessage "Winget sources updated successfully"
+            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1014 -EntryType Information -Message "Winget sources updated successfully"
+        } catch {
+            Write-LogMessage "Winget source update: $_" "WARNING"
+            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 3013 -EntryType Warning -Message "Winget source update failed: $_"
+        }
+        
+        # FINAL RESULTS: Summary of multi-pass update process
+        $finalFailedCount = $failedApps.Count
+        if ($finalFailedCount -eq 0) {
+            Write-LogMessage "All core applications successfully updated with multi-pass remediation"
+            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1017 -EntryType Information -Message "All core applications successfully updated using multi-pass remediation strategy"
+            return $true
+        } else {
+            Write-LogMessage "$finalFailedCount applications failed all remediation attempts" "WARNING"
+            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 3018 -EntryType Warning -Message "$finalFailedCount applications failed all remediation attempts after $maxPasses passes"
+            return $true  # Continue with Windows Updates even if some Winget updates failed
+        }
+        
+    } catch {
+        Write-LogMessage "Winget update process failed: $_" "ERROR"
+        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 5010 -EntryType Error -Message "Winget update process failed: $_"
+        return $false
+    }
+
+try {
+    $wingetSuccess = Update-CoreAppsWithWinget
+} catch {
+    Write-LogMessage "Error executing winget updates: $_" "ERROR"
+    $wingetSuccess = $false
+}
+
+if ($wingetSuccess) {
+    Write-LogMessage "Core applications update phase completed successfully"
+} else {
+    Write-LogMessage "Winget updates completed with some issues - continuing with Windows Updates" "WARNING"
+}
+
+Write-LogMessage "=========================================="
+Write-LogMessage "PHASE 2: Beginning Windows Update Process"
+Write-LogMessage "=========================================="
+Update-DashboardStatus -Phase "windows" -Progress 50 -CurrentOperation "Beginning Windows Update scan..."
+
+# POWERSHELL GALLERY TRUST CONFIGURATION: Enable automatic module installation
+# WHY NEEDED: First-time users get security prompts when installing from PowerShell Gallery
+# SOLUTION: Set the repository as trusted to avoid interactive prompts
+try {
+    Write-LogMessage "Configuring PowerShell Gallery as trusted repository..."
+    # SET-PSREPOSITORY: Configure PowerShell Gallery trust level
+    # -Name "PSGallery": The default PowerShell module repository
+    # -InstallationPolicy Trusted: Allow automatic installation without prompts
+    Set-PSRepository -Name "PSGallery" -InstallationPolicy Trusted
+    Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1001 -EntryType Information -Message "PowerShell Gallery configured as trusted repository"
+} catch {
+    Write-LogMessage "PowerShell Gallery configuration: $_" "WARNING"
+    Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 3001 -EntryType Warning -Message "PowerShell Gallery trust configuration failed: $_"
+}
+
+# NUGET PROVIDER INSTALLATION: Required for PowerShell module installation
+# WHY NUGET: PowerShell Gallery (where PSWindowsUpdate lives) requires NuGet provider
+# FIRST-TIME USER HANDLING: NuGet provider prompts for confirmation on first install
+# SOLUTION: Use -Force and additional trust parameters to handle virgin systems
+try {
+    if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
+        Write-LogMessage "Installing NuGet provider (first-time setup)..."
+        # COMPREHENSIVE INSTALLATION PARAMETERS:
+        # -Force: Skip all confirmation prompts
+        # -ForceBootstrap: Install even if bootstrapping is required
+        # -Confirm disabled: Suppress any remaining confirmation dialogs
+        # -Scope AllUsers: Install for all users (requires admin, which we have)
+        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ForceBootstrap -Confirm:$false -Scope AllUsers | Out-Null
+        Write-LogMessage "NuGet provider installed successfully (first-time configuration completed)"
+        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1002 -EntryType Information -Message "NuGet provider installed successfully for first-time user"
+    } else {
+        Write-LogMessage "NuGet provider already available"
+        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1003 -EntryType Information -Message "NuGet provider already available"
+    }
+} catch {
+    # CRITICAL ERROR: Can't continue without NuGet provider
+    Write-LogMessage "Failed to install NuGet provider: $_" "ERROR"
+    Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 5001 -EntryType Error -Message "Critical failure: NuGet provider installation failed: $_"
+    Exit 1
+}
+
+# PSWINDOWSUPDATE MODULE: Core functionality for Windows Update management
+# WHY THIS MODULE: Provides comprehensive PowerShell cmdlets for update management
+# Much more reliable and feature-complete than WUA API directly
+# FIRST-TIME INSTALLATION: Handle virgin PowerShell installations with full automation
+try {
+    # AVAILABILITY CHECK: See if module is already installed
+    if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
+        Write-LogMessage "Installing PSWindowsUpdate module (with full automation for first-time users)..."
+        # COMPREHENSIVE INSTALLATION PARAMETERS FOR VIRGIN SYSTEMS:
+        # -Force: Overwrite any existing versions
+        # -SkipPublisherCheck: Don't verify digital signatures (module is trusted)
+        # -Confirm disabled: Suppress all confirmation prompts
+        # -AllowClobber: Overwrite any conflicting commands from other modules
+        # -Scope AllUsers: Install for all users system-wide
+        # -Repository PSGallery: Explicitly specify the source (now trusted)
+        Install-Module -Name PSWindowsUpdate -Force -SkipPublisherCheck -Confirm:$false -AllowClobber -Scope AllUsers -Repository PSGallery | Out-Null
+        Write-LogMessage "PSWindowsUpdate module installed successfully"
+        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1004 -EntryType Information -Message "PSWindowsUpdate module installed successfully"
+    }
+    
+    # IMPORT CHECK: Make sure module is loaded into current session
+    if (-not (Get-Module -Name PSWindowsUpdate)) {
+        Write-LogMessage "Importing PSWindowsUpdate module..."
+        # IMPORT WITH FORCE: Reload module even if already loaded (ensures latest version)
+        Import-Module PSWindowsUpdate -Force | Out-Null
+        Write-LogMessage "PSWindowsUpdate module imported successfully"
+        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1005 -EntryType Information -Message "PSWindowsUpdate module imported successfully"
+    }
+} catch {
+    # CRITICAL ERROR: Cannot perform updates without this module
+    Write-LogMessage "Failed to install/import PSWindowsUpdate module: $_" "ERROR"
+    Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 5002 -EntryType Error -Message "Critical failure: PSWindowsUpdate module installation/import failed: $_"
+    Exit 1
+}
+
+# MICROSOFT UPDATE SERVICE: Enable updates for Microsoft products (not just Windows)
+# WHY NEEDED: By default, Windows Update only updates Windows itself
+# This enables Office, .NET, SQL Server, and other Microsoft product updates
+try {
+    Write-LogMessage "Configuring Microsoft Update Service..."
+    # ADD-WUSERVICEMANAGER: Registers Microsoft Update as an update source
+    # -MicrosoftUpdate: Specifically adds the Microsoft Update service
+    # -Confirm disabled: Suppress confirmation prompts for automation
+    Add-WUServiceManager -MicrosoftUpdate -Confirm:$false | Out-Null
+    Write-LogMessage "Microsoft Update Service configured"
+} catch {
+    # NON-CRITICAL: Update process can continue with just Windows updates
+    Write-LogMessage "Microsoft Update Service configuration: $_" "WARNING"
+}
+
+# WSUS BYPASS CONFIGURATION: Handle corporate WSUS environments
+# WHY NEEDED: Many corporate environments use WSUS servers that may not have
+# all updates available, or may have delayed update approval processes
+# STRATEGY: Temporarily bypass WSUS, then restore original configuration
+$wsusBypassed = $false  # Flag to track if we need to restore settings later
+$registryPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+
+try {
+    # REGISTRY CHECK: See if WSUS is configured via Group Policy
+    if (Test-Path $registryPath) {
+        # VALUE RETRIEVAL: Check current UseWUServer setting
+        # UseWUServer = 1 means "use WSUS server", 0 means "use Microsoft Update"
+        $currentWSUSSetting = Get-ItemProperty -Path $registryPath -Name "UseWUServer" -ErrorAction SilentlyContinue
+        
+        if ($currentWSUSSetting -and $currentWSUSSetting.UseWUServer -eq 1) {
+            Write-LogMessage "Temporarily bypassing WSUS configuration..."
+            
+            # TEMPORARY BYPASS: Set to 0 to use Microsoft Update directly
+            Set-ItemProperty -Path $registryPath -Name "UseWUServer" -Value 0
+            $wsusBypassed = $true  # Remember that we changed this
+            
+            # SERVICE RESTART: Windows Update service must be restarted to recognize change
+            Write-LogMessage "Restarting Windows Update service..."
+            Restart-Service -Name wuauserv -Force | Out-Null
+            
+            # STABILIZATION DELAY: Allow service to fully restart and initialize
+            Start-Sleep -Seconds 10
+            Write-LogMessage "Windows Update service restarted"
+        }
+    }
+} catch {
+    # NON-CRITICAL: Updates might still work even if WSUS bypass fails
+    Write-LogMessage "WSUS configuration handling: $_" "WARNING"
+}
+
+# WIZMO PREPARATION: Download and verify Wizmo for potential reboots
+# WHY EARLY: Better to download now while internet is available than during reboot cycle
+$wizmoReady = Confirm-WizmoAvailability
+Write-LogMessage "Wizmo status: $(if ($wizmoReady) {'Ready for silent reboots'} else {'Will use fallback reboot method'})"
+
+# ============================================================================
+# MAIN UPDATE INSTALLATION LOOP
+# ============================================================================
+
+# LOOP PARAMETERS: Prevent infinite loops while allowing multiple update cycles
+# WHY MULTIPLE CYCLES: Some updates only become available after others are installed
+# WHY LIMIT CYCLES: Prevent infinite loops in case of persistent issues
+$maxCycles = 10           # Maximum number of update scan/install cycles
+$cycleCount = 0           # Current cycle counter
+$totalUpdatesInstalled = 0 # Running total of updates installed
+
+Write-LogMessage "Starting automated update installation process..."
+
+# MAIN PROCESSING LOOP: Continue until no more updates available or max cycles reached
+do {
+    $cycleCount++
+    $updatesThisCycle = 0  # Reset counter for this cycle
+    
+    Write-LogMessage "--- Update Cycle $cycleCount of $maxCycles ---"
+    Update-DashboardStatus -Phase "windows" -Progress (50 + ($cycleCount * 5)) -CurrentOperation "Update Cycle $cycleCount of $maxCycles"
+    
+    # UPDATE SCANNING: Check for available updates
+    try {
+        Write-LogMessage "Scanning for available updates..."
+        
+        # GET-WULIST: Retrieve list of available updates
+        # -MicrosoftUpdate: Include Microsoft products, not just Windows
+        # -IgnoreReboot: Don't exclude updates that require reboot
+        $availableUpdates = Get-WUList -MicrosoftUpdate -IgnoreReboot
+        
+        # AVAILABILITY CHECK: Determine if updates were found
+        if ($availableUpdates -and $availableUpdates.Count -gt 0) {
+            Write-LogMessage "Found $($availableUpdates.Count) available updates"
+            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 2001 -EntryType Information -Message "Found $($availableUpdates.Count) available updates in cycle $cycleCount"
+            
+            # UPDATE ENUMERATION: Log details of each update for audit trail
+            $availableUpdates | ForEach-Object {
+                # SIZE CALCULATION: Convert bytes to MB for human readability
+                $sizeMB = [math]::Round($_.Size / 1MB, 2)
+                $updateDetails = "  - $($_.Title) (Size: $sizeMB MB)"
+                Write-LogMessage $updateDetails
+                # DETAILED EVENT LOGGING: Individual update information
+                Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 2002 -EntryType Information -Message "Available Update: $($_.Title), Size: $sizeMB MB, KB: $($_.KBArticleIDs -join ',')"
+            }
+            
+            $updatesThisCycle = $availableUpdates.Count
+        } else {
+            # NO UPDATES: Exit the loop as update process is complete
+            Write-LogMessage "No updates found in this cycle"
+            break
+        }
+    } catch {
+        # SCAN FAILURE: Log error and exit loop
+        Write-LogMessage "Failed to scan for updates: $_" "ERROR"
+        break
+    }
+    
+    # UPDATE INSTALLATION: Install all available updates
+    if ($updatesThisCycle -gt 0) {
+        try {
+            Write-LogMessage "Installing $updatesThisCycle updates automatically..."
+        Update-DashboardStatus -Phase "windows" -Progress (55 + ($cycleCount * 5)) -CurrentOperation "Installing $updatesThisCycle updates..."
+            
+            # INSTALL-WUUPDATES: Core installation command
+            # -MicrosoftUpdate: Include Microsoft products
+            # -AcceptAll: Accept all EULAs and terms automatically
+            # -IgnoreReboot: Don't automatically reboot (we'll handle this ourselves)
+            # -Confirm disabled: Suppress all confirmation prompts
+            # -Verbose disabled: Reduce output noise for cleaner logs
+            $installOutput = Install-WUUpdates -MicrosoftUpdate -AcceptAll -IgnoreReboot -Confirm:$false -Verbose:$false
+            
+            # LOG INSTALLATION RESULTS: Capture and log update installation details
+            if ($installOutput) {
+                Write-LogMessage "Update installation details logged"
+                # LOG INDIVIDUAL UPDATES: Record each installed update
+                $installOutput | ForEach-Object {
+                    if ($_.Title) {
+                        Write-LogMessage "Installed: $($_.Title) - Status: $($_.Result)" "INFO"
+                        Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 2010 -EntryType Information -Message "Successfully installed update: $($_.Title)"
+                    }
+                }
+            }
+            
+            # PROGRESS TRACKING: Update running total
+            $totalUpdatesInstalled += $updatesThisCycle
+            Write-LogMessage "Updates installed successfully (Total so far: $totalUpdatesInstalled)"
+            Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 2003 -EntryType Information -Message "Installed $updatesThisCycle updates in cycle $cycleCount. Total installed: $totalUpdatesInstalled"
+            
+            # REBOOT ASSESSMENT: Check if system restart is required
+            # GET-WUREBOOTSTATUS: Determines if pending updates require restart
+            # -Silent: Don't display any UI, just return true/false
+            $rebootRequired = Get-WURebootStatus -Silent
+            
+            # REBOOT HANDLING: Manage system restart for update completion
+            if ($rebootRequired) {
+                Write-LogMessage "System reboot required - initiating silent reboot..."
+                Write-LogMessage "Updates will continue after reboot..."
+                Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 2004 -EntryType Information -Message "System reboot required after installing $updatesThisCycle updates. Initiating silent reboot and continuation."
+                
+                # SCHEDULED TASK CREATION: Ensure script continues after reboot
+                # WHY NEEDED: PowerShell scripts don't automatically resume after reboot
+                # SOLUTION: Create a scheduled task that runs at startup with the same script
+                
+                # TASK COMPONENTS:
+                # Action: What to run (this same PowerShell script)
+                $taskAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`""
+                
+                # Trigger: When to run (at system startup)
+                $taskTrigger = New-ScheduledTaskTrigger -AtStartup
+                
+                # Principal: Run as SYSTEM account with highest privileges
+                # WHY SYSTEM: Ensures task runs even if no user is logged in
+                # RunLevel Highest: Equivalent to "Run as Administrator"
+                $taskPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+                
+                # Settings: Task behavior configuration
+                # AllowStartIfOnBatteries: Run even on laptop battery power
+                # DontStopIfGoingOnBatteries: Continue even if switching to battery
+                # StartWhenAvailable: Run as soon as possible if startup time is missed
+                $taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+                
+                try {
+                    # TASK REGISTRATION: Create the scheduled task
+                    # -Force: Overwrite any existing task with same name
+                    Register-ScheduledTask -TaskName "WindowsUpdateContinuation" -Action $taskAction -Trigger $taskTrigger -Principal $taskPrincipal -Settings $taskSettings -Force | Out-Null
+                    Write-LogMessage "Scheduled task created for post-reboot continuation"
+                    Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 2005 -EntryType Information -Message "Scheduled task 'WindowsUpdateContinuation' created for post-reboot continuation"
+                } catch {
+                    # TASK CREATION FAILURE: Non-critical, but user might need to manually restart
+                    Write-LogMessage "Could not create scheduled task: $_" "WARNING"
+                    Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 3020 -EntryType Warning -Message "Failed to create scheduled task for continuation: $_"
+                }
+                
+                # SILENT REBOOT EXECUTION: Restart system without user interaction
+                Invoke-SilentReboot
+                # SCRIPT TERMINATION: Script ends here, resumes after reboot via scheduled task
+                Exit 0
+            }
+            
+        } catch {
+            # INSTALLATION FAILURE: Log error and exit loop
+            Write-LogMessage "Failed to install updates: $_" "ERROR"
+            break
+        }
+    }
+    
+    # CYCLE DELAY: Brief pause between update cycles to allow system stabilization
+    Start-Sleep -Seconds 5
+    
+# LOOP CONTINUATION CONDITIONS: Continue while updates exist and within cycle limit
+} while ($updatesThisCycle -gt 0 -and $cycleCount -lt $maxCycles)
+
+# ============================================================================
+# CLEANUP AND FINALIZATION
+# ============================================================================
+
+# SCHEDULED TASK CLEANUP: Remove the continuation task since updates are complete
+# WHY CLEANUP: Prevent the task from running unnecessarily on future reboots
+try {
+    if (Get-ScheduledTask -TaskName "WindowsUpdateContinuation" -ErrorAction SilentlyContinue) {
+        Unregister-ScheduledTask -TaskName "WindowsUpdateContinuation" -Confirm:$false
+        Write-LogMessage "Cleanup: Removed scheduled continuation task"
+    }
+} catch {
+    # NON-CRITICAL: Task removal failure won't affect system functionality
+    Write-LogMessage "Scheduled task cleanup: $_" "WARNING"
+}
+
+# WSUS CONFIGURATION RESTORATION: Restore original enterprise settings
+# WHY IMPORTANT: Corporate environments need their WSUS settings maintained
+if ($wsusBypassed) {
+    try {
+        Write-LogMessage "Restoring original WSUS configuration..."
+        # RESTORE SETTING: Set UseWUServer back to 1 (use WSUS)
+        Set-ItemProperty -Path $registryPath -Name "UseWUServer" -Value 1
+        # SERVICE RESTART: Apply the restored configuration
+        Restart-Service -Name wuauserv -Force | Out-Null
+        Write-LogMessage "WSUS configuration restored"
+    } catch {
+        # RESTORATION FAILURE: Log warning but don't fail entire script
+        Write-LogMessage "WSUS restoration: $_" "WARNING"
+    }
+}
+
+# FINAL STATUS ASSESSMENT: Comprehensive check of update completion status
+try {
+    # REMAINING UPDATES CHECK: See if any updates are still available
+    $remainingUpdates = Get-WUList -MicrosoftUpdate
+    
+    # FINAL REBOOT CHECK: Determine if one final reboot is needed
+    $finalRebootNeeded = Get-WURebootStatus -Silent
+    
+    # REMAINING UPDATES ANALYSIS: Report any updates that couldn't be installed
+    if ($remainingUpdates -and $remainingUpdates.Count -gt 0) {
+        Write-LogMessage "Notice: $($remainingUpdates.Count) updates still available (may require user interaction or be optional)"
+        # DETAILED REMAINING LIST: Log each remaining update for administrator review
+        $remainingUpdates | ForEach-Object {
+            Write-LogMessage "  Remaining: $($_.Title)"
+        }
+    }
+    
+    # FINAL REBOOT HANDLING: Some updates require a final reboot to complete
+    if ($finalRebootNeeded) {
+        Write-LogMessage "Final reboot required to complete all updates"
+        Write-LogMessage "Performing final silent reboot..."
+        # NO SCHEDULED TASK: This is the final reboot, no continuation needed
+        Invoke-SilentReboot
+        Exit 0
+    }
+} catch {
+    # STATUS CHECK FAILURE: Non-critical, but log for troubleshooting
+    Write-LogMessage "Final status check: $_" "WARNING"
+}
+
+# ============================================================================
+# SCRIPT COMPLETION AND REPORTING
+# ============================================================================
+
+# FINAL STATUS UPDATE: Mark script as completed
+Update-DashboardStatus -Phase "completed" -Progress 100 -CurrentOperation "Script completed successfully"
+
+# COMPLETION STATUS FILE: Create completion marker
+try {
+    $completionFile = Join-Path "C:\Scripts" "update-completed.json"
+    $completionData = @{
+        completedAt = Get-Date -Format "yyyy-MM-ddTHH:mm:ss"
+        totalUpdates = $totalUpdatesInstalled
+        finalStatus = "success"
+        message = "Windows Update process completed successfully"
+        nextScheduledRun = "2nd Tuesday of next month at 2:00 AM"
+        manualRunCommand = "Start-ScheduledTask -TaskName 'WindowsUpdate-Manual'"
+    } | ConvertTo-Json
+    
+    $completionData | Out-File -FilePath $completionFile -Encoding UTF8
+    Write-LogMessage "Completion status file created: $completionFile"
+} catch {
+    Write-LogMessage "Failed to create completion status file: $_" "WARNING"
+}
+
+# SUCCESS SUMMARY: Comprehensive completion report
+Write-LogMessage "=========================================="
+Write-LogMessage "Automated Windows Update Process Completed"
+Write-LogMessage "Total Updates Installed: $totalUpdatesInstalled"
+Write-LogMessage "System Status: Up to Date"
+Write-LogMessage "Log Location: $global:logFile"
+Write-LogMessage "Event Viewer: Check Application Log for 'WindowsUpdateScript' events"
+Write-LogMessage "Next Scheduled Run: 2nd Tuesday of next month"
+Write-LogMessage "Manual Execution: Start-ScheduledTask -TaskName 'WindowsUpdate-Manual'"
+Write-LogMessage "=========================================="
+
+# FINAL EVENT LOG ENTRY: Completion summary for monitoring systems
+Write-EventLog -LogName Application -Source "WindowsUpdateScript" -EventId 1999 -EntryType Information -Message "Windows Update Script completed successfully. Total updates installed: $totalUpdatesInstalled. System is now up to date."
+
+# CONSOLE SUMMARY: User-friendly completion message with color coding
+Write-Host "`nWindows Update Process Completed Successfully!" -ForegroundColor Green
+Write-Host "Total updates installed: $totalUpdatesInstalled" -ForegroundColor Green
+Write-Host "Check log file: $global:logFile" -ForegroundColor Cyan
+Write-Host "Event Viewer: Application Log -> Source: WindowsUpdateScript" -ForegroundColor Cyan
+
+# CLEAN EXIT: Indicate successful completion to the operating system
+Exit 0
+>>>>>>> 812fb49 (Implement code changes to enhance functionality and improve performance)

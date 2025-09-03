@@ -18,7 +18,10 @@ A fully automated Windows update solution that handles system updates, applicati
 ## 🚀 Quick Start
 
 ### Prerequisites
+<<<<<<< HEAD
 
+=======
+>>>>>>> 812fb49 (Implement code changes to enhance functionality and improve performance)
 - Windows 10/11 (Server versions may work but are not officially supported)
 - PowerShell 5.1 or later
 - Administrative privileges
@@ -90,14 +93,20 @@ To create scheduled tasks for automatic updates:
 ```
 
 This will create two scheduled tasks:
+<<<<<<< HEAD
 
+=======
+>>>>>>> 812fb49 (Implement code changes to enhance functionality and improve performance)
 - **WindowsUpdate-Maintenance**: Runs on Patch Tuesday at 1:00 AM
 - **WindowsUpdate-Retry**: Runs daily at 2:00 AM if the main task fails
 
 ## 📝 Logging
 
 All operations are logged to:
+<<<<<<< HEAD
 
+=======
+>>>>>>> 812fb49 (Implement code changes to enhance functionality and improve performance)
 - Windows Event Log (Application log, Source: `WindowsUpdateScript`)
 - Console output
 - Dashboard (if enabled)
